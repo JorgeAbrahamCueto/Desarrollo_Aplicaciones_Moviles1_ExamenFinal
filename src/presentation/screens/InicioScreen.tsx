@@ -261,6 +261,36 @@ export default function InicioScreen() {
             </Text>
           )}
         </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.moduleCard,
+            pressed && styles.buttonPressed,
+          ]}
+          onPress={() => {
+            router.push("/guia-felina");
+          }}
+        >
+          <Text style={styles.moduleIcon}>
+            🐱
+          </Text>
+
+          <View style={styles.moduleInformation}>
+            <Text style={styles.moduleTitle}>
+              Guía felina
+            </Text>
+
+            <Text style={styles.moduleDescription}>
+              Conoce razas, características e imágenes
+              obtenidas desde TheCatAPI.
+            </Text>
+          </View>
+
+          <Text style={styles.arrow}>
+            ›
+          </Text>
+        </Pressable>
+
       </ScrollView>
     </SafeAreaView>
   );
