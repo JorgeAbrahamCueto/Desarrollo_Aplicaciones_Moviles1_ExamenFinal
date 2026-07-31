@@ -42,6 +42,14 @@ import {
 } from "../../infrastructure/database/CompraRepository";
 
 import {
+  sincronizarPedidos,
+} from "../../infrastructure/sync/PedidoSyncService";
+
+import type {
+  ResultadoSincronizacion,
+} from "../../infrastructure/sync/PedidoSyncService";
+
+import {
   useAuth,
 } from "../context/AuthContext";
 
@@ -56,10 +64,16 @@ const ESTADO_LABELS: Record<
 };
 
 export default function DetallePedidoScreen() {
-  const database = useSQLiteContext();
-  const { usuario } = useAuth();
+  const database =
+    useSQLiteContext();
 
-  const { id } = useLocalSearchParams<{
+  const {
+    usuario,
+  } = useAuth();
+
+  const {
+    id,
+  } = useLocalSearchParams<{
     id: string;
   }>();
 
@@ -80,7 +94,8 @@ export default function DetallePedidoScreen() {
 
   const cargarPedido = useCallback(
     async () => {
-      const pedidoId = Number(id);
+      const pedidoId =
+        Number(id);
 
       if (
         !usuario ||
@@ -115,7 +130,9 @@ export default function DetallePedidoScreen() {
         }
 
         setPedido(resultado);
-        setCantidad(resultado.cantidad);
+        setCantidad(
+          resultado.cantidad
+        );
       } catch (caughtError) {
         console.error(
           "Error al cargar pedido:",
@@ -138,11 +155,34 @@ export default function DetallePedidoScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      cargarPedido();
+      void cargarPedido();
 
       return undefined;
     }, [cargarPedido])
   );
+
+  async function sincronizarCambios():
+  Promise<
+    ResultadoSincronizacion | null
+  > {
+    if (!usuario) {
+      return null;
+    }
+
+    try {
+      return await sincronizarPedidos(
+        database,
+        usuario.uid
+      );
+    } catch (caughtError) {
+      console.error(
+        "No se pudo ejecutar la sincronización:",
+        caughtError
+      );
+
+      return null;
+    }
+  }
 
   const puedeEditar =
     pedido?.estado === "PENDIENTE";
@@ -175,27 +215,42 @@ export default function DetallePedidoScreen() {
     try {
       setProcesando(true);
 
-      const actualizado =
-        await actualizarCantidadPedido(
-          database,
-          pedido.id,
-          usuario.uid,
-          cantidad
-        );
-
-      setPedido(actualizado);
-
-      Alert.alert(
-        "Pedido actualizado",
-        "La cantidad se actualizó correctamente"
+      await actualizarCantidadPedido(
+        database,
+        pedido.id,
+        usuario.uid,
+        cantidad
       );
+
+      const sincronizacion =
+        await sincronizarCambios();
+
+      await cargarPedido();
+
+      if (
+        sincronizacion?.conectado &&
+        sincronizacion.errores === 0
+      ) {
+        Alert.alert(
+          "Pedido actualizado",
+          "La cantidad, el stock y Firestore fueron actualizados correctamente."
+        );
+      } else {
+        Alert.alert(
+          "Pedido actualizado",
+          "Los cambios se guardaron localmente y se sincronizarán cuando exista conexión."
+        );
+      }
     } catch (caughtError) {
       const mensaje =
         caughtError instanceof Error
           ? caughtError.message
           : "No se pudo actualizar el pedido";
 
-      Alert.alert("Error", mensaje);
+      Alert.alert(
+        "Error",
+        mensaje
+      );
     } finally {
       setProcesando(false);
     }
@@ -221,7 +276,9 @@ export default function DetallePedidoScreen() {
         {
           text: "Cancelar pedido",
           style: "destructive",
-          onPress: cancelarPedido,
+          onPress: () => {
+            void cancelarPedido();
+          },
         },
       ]
     );
@@ -235,27 +292,41 @@ export default function DetallePedidoScreen() {
     try {
       setProcesando(true);
 
-      const actualizado =
-        await cancelarPedidoConStock(
-          database,
-          pedido.id,
-          usuario.uid
-        );
-
-      setPedido(actualizado);
-      setCantidad(actualizado.cantidad);
-
-      Alert.alert(
-        "Pedido cancelado",
-        "El pedido fue cancelado correctamente"
+      await cancelarPedidoConStock(
+        database,
+        pedido.id,
+        usuario.uid
       );
+
+      const sincronizacion =
+        await sincronizarCambios();
+
+      await cargarPedido();
+
+      if (
+        sincronizacion?.conectado &&
+        sincronizacion.errores === 0
+      ) {
+        Alert.alert(
+          "Pedido cancelado",
+          "El pedido fue cancelado, el stock fue restaurado y Firestore fue actualizado."
+        );
+      } else {
+        Alert.alert(
+          "Pedido cancelado",
+          "El pedido se canceló localmente y se sincronizará cuando exista conexión."
+        );
+      }
     } catch (caughtError) {
       const mensaje =
         caughtError instanceof Error
           ? caughtError.message
           : "No se pudo cancelar el pedido";
 
-      Alert.alert("Error", mensaje);
+      Alert.alert(
+        "Error",
+        mensaje
+      );
     } finally {
       setProcesando(false);
     }
@@ -268,7 +339,7 @@ export default function DetallePedidoScreen() {
 
     Alert.alert(
       "Eliminar pedido",
-      "Esta acción eliminará definitivamente el pedido del dispositivo.",
+      "Esta acción eliminará definitivamente el pedido del dispositivo y de Firestore.",
       [
         {
           text: "Conservar",
@@ -277,7 +348,9 @@ export default function DetallePedidoScreen() {
         {
           text: "Eliminar",
           style: "destructive",
-          onPress: ejecutarEliminacion,
+          onPress: () => {
+            void ejecutarEliminacion();
+          },
         },
       ]
     );
@@ -297,14 +370,26 @@ export default function DetallePedidoScreen() {
         usuario.uid
       );
 
+      const sincronizacion =
+        await sincronizarCambios();
+
+      const eliminadoEnFirestore =
+        sincronizacion?.conectado === true &&
+        sincronizacion.errores === 0;
+
       Alert.alert(
         "Pedido eliminado",
-        "El pedido fue eliminado correctamente",
+        eliminadoEnFirestore
+          ? "El pedido fue eliminado del dispositivo y de Firestore."
+          : "El pedido fue eliminado del dispositivo. Se eliminará de Firestore cuando exista conexión.",
         [
           {
             text: "Volver a mis pedidos",
-            onPress: () =>
-              router.replace("/pedidos"),
+            onPress: () => {
+              router.replace(
+                "/pedidos"
+              );
+            },
           },
         ]
       );
@@ -314,7 +399,10 @@ export default function DetallePedidoScreen() {
           ? caughtError.message
           : "No se pudo eliminar el pedido";
 
-      Alert.alert("Error", mensaje);
+      Alert.alert(
+        "Error",
+        mensaje
+      );
     } finally {
       setProcesando(false);
     }
@@ -322,14 +410,18 @@ export default function DetallePedidoScreen() {
 
   if (cargando) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView
+        style={styles.safeArea}
+      >
         <View style={styles.center}>
           <ActivityIndicator
             size="large"
             color="#176B5B"
           />
 
-          <Text style={styles.loadingText}>
+          <Text
+            style={styles.loadingText}
+          >
             Cargando pedido...
           </Text>
         </View>
@@ -339,28 +431,40 @@ export default function DetallePedidoScreen() {
 
   if (error || !pedido) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView
+        style={styles.safeArea}
+      >
         <View style={styles.center}>
-          <Text style={styles.errorIcon}>
+          <Text
+            style={styles.errorIcon}
+          >
             ⚠️
           </Text>
 
-          <Text style={styles.errorTitle}>
+          <Text
+            style={styles.errorTitle}
+          >
             Pedido no disponible
           </Text>
 
-          <Text style={styles.errorText}>
+          <Text
+            style={styles.errorText}
+          >
             {error}
           </Text>
 
           <Pressable
             style={styles.primaryButton}
-            onPress={() =>
-              router.replace("/pedidos")
-            }
+            onPress={() => {
+              router.replace(
+                "/pedidos"
+              );
+            }}
           >
             <Text
-              style={styles.primaryButtonText}
+              style={
+                styles.primaryButtonText
+              }
             >
               Volver a mis pedidos
             </Text>
@@ -373,27 +477,40 @@ export default function DetallePedidoScreen() {
   const total =
     cantidad * pedido.precio;
 
-  const fecha = new Date(
-    pedido.fechaRegistro
-  ).toLocaleString("es-PE");
+  const fecha =
+    new Date(
+      pedido.fechaRegistro
+    ).toLocaleString("es-PE");
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView
+      style={styles.safeArea}
+    >
       <ScrollView
-        contentContainerStyle={styles.container}
-        showsVerticalScrollIndicator={false}
+        contentContainerStyle={
+          styles.container
+        }
+        showsVerticalScrollIndicator={
+          false
+        }
       >
         <View style={styles.header}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => {
+              router.back();
+            }}
             disabled={procesando}
           >
-            <Text style={styles.backText}>
+            <Text
+              style={styles.backText}
+            >
               ‹ Mis pedidos
             </Text>
           </Pressable>
 
-          <Text style={styles.headerIcon}>
+          <Text
+            style={styles.headerIcon}
+          >
             📦
           </Text>
         </View>
@@ -403,25 +520,31 @@ export default function DetallePedidoScreen() {
         </Text>
 
         <View style={styles.statusRow}>
-          <Text style={styles.productName}>
+          <Text
+            style={styles.productName}
+          >
             {pedido.producto}
           </Text>
 
           <View
             style={[
               styles.statusBadge,
+
               pedido.estado ===
-              "CANCELADO" &&
-              styles.statusCancelled,
+                "CANCELADO" &&
+                styles.statusCancelled,
+
               pedido.estado ===
-              "ENTREGADO" &&
-              styles.statusDelivered,
+                "ENTREGADO" &&
+                styles.statusDelivered,
             ]}
           >
-            <Text style={styles.statusText}>
+            <Text
+              style={styles.statusText}
+            >
               {
                 ESTADO_LABELS[
-                pedido.estado
+                  pedido.estado
                 ]
               }
             </Text>
@@ -431,7 +554,9 @@ export default function DetallePedidoScreen() {
         <View style={styles.card}>
           <DetailRow
             label="Cliente"
-            value={pedido.clienteNombre}
+            value={
+              pedido.clienteNombre
+            }
           />
 
           <DetailRow
@@ -441,7 +566,9 @@ export default function DetallePedidoScreen() {
 
           <DetailRow
             label="Precio unitario"
-            value={`S/ ${pedido.precio.toFixed(2)}`}
+            value={
+              `S/ ${pedido.precio.toFixed(2)}`
+            }
           />
 
           <DetailRow
@@ -455,27 +582,36 @@ export default function DetallePedidoScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>
+          <Text
+            style={styles.sectionTitle}
+          >
             Cantidad
           </Text>
 
           {puedeEditar ? (
             <>
-              <Text style={styles.helpText}>
+              <Text
+                style={styles.helpText}
+              >
                 Puedes modificar la cantidad mientras
                 el pedido esté pendiente.
               </Text>
 
               <View
-                style={styles.quantitySelector}
+                style={
+                  styles.quantitySelector
+                }
               >
                 <Pressable
                   style={[
                     styles.quantityButton,
+
                     cantidad <= 1 &&
-                    styles.disabledButton,
+                      styles.disabledButton,
                   ]}
-                  onPress={disminuirCantidad}
+                  onPress={
+                    disminuirCantidad
+                  }
                   disabled={
                     cantidad <= 1 ||
                     procesando
@@ -491,14 +627,20 @@ export default function DetallePedidoScreen() {
                 </Pressable>
 
                 <Text
-                  style={styles.quantityValue}
+                  style={
+                    styles.quantityValue
+                  }
                 >
                   {cantidad}
                 </Text>
 
                 <Pressable
-                  style={styles.quantityButton}
-                  onPress={aumentarCantidad}
+                  style={
+                    styles.quantityButton
+                  }
+                  onPress={
+                    aumentarCantidad
+                  }
                   disabled={procesando}
                 >
                   <Text
@@ -512,34 +654,45 @@ export default function DetallePedidoScreen() {
               </View>
             </>
           ) : (
-            <Text style={styles.readOnlyQuantity}>
+            <Text
+              style={
+                styles.readOnlyQuantity
+              }
+            >
               {pedido.cantidad} unidades
             </Text>
           )}
 
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>
+            <Text
+              style={styles.totalLabel}
+            >
               Total
             </Text>
 
-            <Text style={styles.totalValue}>
+            <Text
+              style={styles.totalValue}
+            >
               S/ {total.toFixed(2)}
             </Text>
           </View>
 
           {puedeEditar &&
-            cantidadModificada ? (
+          cantidadModificada ? (
             <Pressable
               style={[
                 styles.primaryButton,
+
                 procesando &&
-                styles.disabledButton,
+                  styles.disabledButton,
               ]}
               onPress={guardarCantidad}
               disabled={procesando}
             >
               <Text
-                style={styles.primaryButtonText}
+                style={
+                  styles.primaryButtonText
+                }
               >
                 Guardar nueva cantidad
               </Text>
@@ -547,14 +700,19 @@ export default function DetallePedidoScreen() {
           ) : null}
         </View>
 
-        {pedido.estado === "PENDIENTE" ? (
+        {pedido.estado ===
+        "PENDIENTE" ? (
           <Pressable
             style={styles.cancelButton}
-            onPress={confirmarCancelacion}
+            onPress={
+              confirmarCancelacion
+            }
             disabled={procesando}
           >
             <Text
-              style={styles.cancelButtonText}
+              style={
+                styles.cancelButtonText
+              }
             >
               Cancelar pedido
             </Text>
@@ -563,7 +721,9 @@ export default function DetallePedidoScreen() {
 
         <Pressable
           style={styles.deleteButton}
-          onPress={confirmarEliminacion}
+          onPress={
+            confirmarEliminacion
+          }
           disabled={procesando}
         >
           {procesando ? (
@@ -572,9 +732,11 @@ export default function DetallePedidoScreen() {
             />
           ) : (
             <Text
-              style={styles.deleteButtonText}
+              style={
+                styles.deleteButtonText
+              }
             >
-              Eliminar pedido del dispositivo
+              Eliminar pedido definitivamente
             </Text>
           )}
         </Pressable>
@@ -594,11 +756,15 @@ function DetailRow({
 }: DetailRowProps) {
   return (
     <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>
+      <Text
+        style={styles.detailLabel}
+      >
         {label}
       </Text>
 
-      <Text style={styles.detailValue}>
+      <Text
+        style={styles.detailValue}
+      >
         {value}
       </Text>
     </View>

@@ -1,5 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getFirestore } from "firebase/firestore";
+import AsyncStorage from
+  "@react-native-async-storage/async-storage";
 
 import {
   getApp,
@@ -14,11 +14,18 @@ import {
   type Auth,
 } from "firebase/auth";
 
+import {
+  getFirestore,
+} from "firebase/firestore";
+
 /*
- * En Expo, TypeScript puede resolver las declaraciones web
- * aunque Metro utilice la implementación de React Native.
+ * Firebase utiliza esta función para conservar
+ * la sesión en React Native mediante AsyncStorage.
+ *
+ * TypeScript puede resolver las declaraciones web,
+ * aunque Metro emplee la implementación móvil.
  */
-// @ts-expect-error -- Firebase expone esta función para React Native.
+// @ts-expect-error -- Firebase lo proporciona en React Native, aunque no aparezca en los tipos web.
 import { getReactNativePersistence } from "firebase/auth";
 
 function obtenerVariable(
@@ -57,7 +64,8 @@ const firebaseConfig: FirebaseOptions = {
 
   messagingSenderId: obtenerVariable(
     "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
-    process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    process.env
+      .EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
   ),
 
   appId: obtenerVariable(
@@ -66,6 +74,10 @@ const firebaseConfig: FirebaseOptions = {
   ),
 };
 
+/*
+ * Evita inicializar Firebase nuevamente
+ * durante Fast Refresh.
+ */
 export const firebaseApp =
   getApps().length > 0
     ? getApp()
@@ -75,16 +87,21 @@ function inicializarAuth(): Auth {
   try {
     return initializeAuth(firebaseApp, {
       persistence:
-        getReactNativePersistence(AsyncStorage),
+        getReactNativePersistence(
+          AsyncStorage
+        ),
     });
   } catch {
     /*
-     * Con Fast Refresh, Firebase puede estar
-     * inicializado previamente.
+     * Durante Fast Refresh, Authentication
+     * puede estar inicializado previamente.
      */
     return getAuth(firebaseApp);
   }
 }
 
-export const auth = inicializarAuth();
-export const db = getFirestore(firebaseApp);
+export const auth =
+  inicializarAuth();
+
+export const db =
+  getFirestore(firebaseApp);

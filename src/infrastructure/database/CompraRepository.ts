@@ -7,8 +7,8 @@ import type {
 } from "../../domain/models/Pedido";
 
 import {
-  crearPedido,
   actualizarPedido,
+  crearPedido,
   eliminarPedido,
   obtenerPedidoPorId,
 } from "./PedidoRepository";
@@ -16,6 +16,10 @@ import {
 import {
   obtenerProductoPorId,
 } from "./ProductoRepository";
+
+import {
+  crearFirebaseIdPedido,
+} from "./PedidoSyncRepository";
 
 interface ResultadoPedido {
   value: Pedido | null;
@@ -159,7 +163,8 @@ export async function actualizarCantidadPedido(
       }
 
       const diferencia =
-        nuevaCantidad - pedido.cantidad;
+        nuevaCantidad -
+        pedido.cantidad;
 
       if (diferencia > 0) {
         const descuento =
@@ -207,10 +212,18 @@ export async function actualizarCantidadPedido(
           {
             clienteNombre:
               pedido.clienteNombre,
-            producto: pedido.producto,
-            cantidad: nuevaCantidad,
-            precio: pedido.precio,
-            estado: pedido.estado,
+
+            producto:
+              pedido.producto,
+
+            cantidad:
+              nuevaCantidad,
+
+            precio:
+              pedido.precio,
+
+            estado:
+              pedido.estado,
           }
         );
     }
@@ -279,10 +292,18 @@ export async function cancelarPedidoConStock(
           {
             clienteNombre:
               pedido.clienteNombre,
-            producto: pedido.producto,
-            cantidad: pedido.cantidad,
-            precio: pedido.precio,
-            estado: "CANCELADO",
+
+            producto:
+              pedido.producto,
+
+            cantidad:
+              pedido.cantidad,
+
+            precio:
+              pedido.precio,
+
+            estado:
+              "CANCELADO",
           }
         );
     }
@@ -327,10 +348,8 @@ export async function eliminarPedidoConStock(
       }
 
       /*
-       * Si todavía estaba pendiente, devolvemos
-       * las unidades antes de eliminarlo.
-       *
-       * Si estaba cancelado, el stock ya fue
+       * Si continúa pendiente, restauramos el stock.
+       * Si ya estaba cancelado, el stock fue
        * restaurado durante la cancelación.
        */
       if (
@@ -349,6 +368,37 @@ export async function eliminarPedidoConStock(
           ]
         );
       }
+
+      /*
+       * El mismo identificador utilizado al subir
+       * el pedido servirá para borrarlo de Firestore.
+       */
+      const firebaseId =
+        pedido.firebaseId ??
+        crearFirebaseIdPedido(pedido);
+
+      /*
+       * Registramos la eliminación antes de borrar
+       * el pedido local. Al estar dentro de la misma
+       * transacción, ambas operaciones se completan
+       * juntas o se revierten juntas.
+       */
+      await database.runAsync(
+        `
+          INSERT OR IGNORE INTO
+            eliminaciones_pendientes (
+              firebaseId,
+              usuarioUid,
+              fechaRegistro
+            )
+          VALUES (?, ?, ?)
+        `,
+        [
+          firebaseId,
+          usuarioUid,
+          new Date().toISOString(),
+        ]
+      );
 
       await eliminarPedido(
         database,

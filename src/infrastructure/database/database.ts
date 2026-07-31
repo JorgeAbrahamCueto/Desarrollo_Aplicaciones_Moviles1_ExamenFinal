@@ -2,7 +2,7 @@ import type {
   SQLiteDatabase,
 } from "expo-sqlite";
 
-const DATABASE_VERSION = 6;
+const DATABASE_VERSION = 7;
 
 interface TableInfoRow {
   name: string;
@@ -206,122 +206,25 @@ export async function initializeDatabase(
   `);
 
   /*
-   * Catálogo inicial. INSERT OR IGNORE evita
-   * duplicar productos en cada arranque.
-   */
-  await database.execAsync(`
-    INSERT OR IGNORE INTO productos (
-      codigo,
-      nombre,
-      descripcion,
-      categoria,
-      precio,
-      stock,
-      imagenUrl,
-      activo
-    )
-    VALUES
-      (
-        'ALI-001',
-        'Royal Canin Adulto',
-        'Alimento balanceado para perros adultos. Presentación de 3 kg.',
-        'ALIMENTOS',
-        75.50,
-        20,
-        NULL,
-        1
-      ),
-      (
-        'ALI-002',
-        'Alimento para gatos',
-        'Alimento completo para gatos adultos. Presentación de 1 kg.',
-        'ALIMENTOS',
-        32.90,
-        18,
-        NULL,
-        1
-      ),
-      (
-        'SAL-001',
-        'Antipulgas Bravecto',
-        'Tableta antipulgas y antigarrapatas para perros.',
-        'SALUD',
-        110.00,
-        12,
-        NULL,
-        1
-      ),
-      (
-        'SAL-002',
-        'Vitaminas para mascotas',
-        'Suplemento multivitamínico para perros y gatos.',
-        'SALUD',
-        39.90,
-        16,
-        NULL,
-        1
-      ),
-      (
-        'HIG-001',
-        'Shampoo medicado',
-        'Shampoo dermatológico para el cuidado de piel y pelaje.',
-        'HIGIENE',
-        28.90,
-        25,
-        NULL,
-        1
-      ),
-      (
-        'HIG-002',
-        'Arena para gatos',
-        'Arena sanitaria absorbente y con control de olores.',
-        'HIGIENE',
-        32.00,
-        22,
-        NULL,
-        1
-      ),
-      (
-        'ACC-001',
-        'Collar regulable',
-        'Collar cómodo y regulable para perros medianos.',
-        'ACCESORIOS',
-        24.50,
-        15,
-        NULL,
-        1
-      ),
-      (
-        'ACC-002',
-        'Plato de acero inoxidable',
-        'Plato resistente para alimento o agua.',
-        'ACCESORIOS',
-        22.90,
-        14,
-        NULL,
-        1
-      ),
-      (
-        'JUG-001',
-        'Juguete mordedor',
-        'Juguete resistente para entretenimiento y cuidado dental.',
-        'JUGUETES',
-        18.50,
-        30,
-        NULL,
-        1
-      ),
-      (
-        'JUG-002',
-        'Pelota para mascotas',
-        'Pelota liviana y resistente para perros.',
-        'JUGUETES',
-        14.90,
-        28,
-        NULL,
-        1
-      );
-  `);
+ * Cola para eliminar posteriormente de Firestore
+ * pedidos borrados mientras no había Internet.
+ */
+await database.execAsync(`
+  CREATE TABLE IF NOT EXISTS
+    eliminaciones_pendientes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+      firebaseId TEXT NOT NULL UNIQUE,
+
+      usuarioUid TEXT NOT NULL,
+
+      fechaRegistro TEXT NOT NULL
+    );
+
+  CREATE INDEX IF NOT EXISTS
+    idx_eliminaciones_usuario
+  ON eliminaciones_pendientes(usuarioUid);
+`);
 
   await database.execAsync(
     `PRAGMA user_version = ${DATABASE_VERSION}`

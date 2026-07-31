@@ -1,11 +1,21 @@
-import { Stack } from "expo-router";
-import { SQLiteProvider } from "expo-sqlite";
+import {
+  Stack,
+} from "expo-router";
 
-import { initializeDatabase } from "../src/infrastructure/database/database";
+import {
+  SQLiteProvider,
+} from "expo-sqlite";
 
-import { AuthProvider } from "../src/presentation/context/AuthContext";
+import {
+  initializeDatabase,
+} from "../src/infrastructure/database/database";
 
-import "../src/infrastructure/firebase/firebaseConfig";
+import {
+  AuthProvider,
+} from "../src/presentation/context/AuthContext";
+
+import SyncManager from
+  "../src/presentation/context/SyncManager";
 
 export default function RootLayout() {
   return (
@@ -20,6 +30,8 @@ export default function RootLayout() {
       }}
     >
       <AuthProvider>
+        <SyncManager />
+
         <Stack
           screenOptions={{
             headerShown: false,
