@@ -1,0 +1,220 @@
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+
+import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
+import { useSQLiteContext } from "expo-sqlite";
+
+import { obtenerUsuarioSesion } from "../../infrastructure/database/SesionRepository";
+
+export default function BienvenidaScreen() {
+  const database = useSQLiteContext();
+
+  const [verificandoSesion, setVerificandoSesion] =
+    useState(true);
+
+  useEffect(() => {
+    let pantallaActiva = true;
+
+    async function verificarSesion() {
+      try {
+        const usuario =
+          await obtenerUsuarioSesion(database);
+
+        if (!pantallaActiva) {
+          return;
+        }
+
+        if (usuario) {
+          router.replace("/inicio");
+          return;
+        }
+
+        setVerificandoSesion(false);
+      } catch (error) {
+        console.error(
+          "Error al verificar la sesión:",
+          error
+        );
+
+        if (pantallaActiva) {
+          setVerificandoSesion(false);
+        }
+      }
+    }
+
+    verificarSesion();
+
+    return () => {
+      pantallaActiva = false;
+    };
+  }, [database]);
+
+  if (verificandoSesion) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingLogo}>🐾</Text>
+
+          <ActivityIndicator
+            size="large"
+            color="#176B5B"
+          />
+
+          <Text style={styles.loadingText}>
+            Verificando sesión...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <View style={styles.content}>
+          <Text style={styles.logo}>🐾</Text>
+
+          <Text style={styles.title}>
+            Veterinaria Patitas
+          </Text>
+
+          <Text style={styles.subtitle}>
+            Cuidamos a tus mascotas y facilitamos la
+            gestión de atenciones y pedidos.
+          </Text>
+        </View>
+
+        <View style={styles.actions}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.primaryButton,
+              pressed && styles.buttonPressed,
+            ]}
+            onPress={() => router.push("/registro")}
+          >
+            <Text style={styles.primaryButtonText}>
+              Crear cuenta
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              pressed && styles.buttonPressed,
+            ]}
+            onPress={() => router.push("/login")}
+          >
+            <Text style={styles.secondaryButtonText}>
+              Iniciar sesión
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#F1F8F6",
+  },
+
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  loadingLogo: {
+    marginBottom: 24,
+    fontSize: 65,
+  },
+
+  loadingText: {
+    marginTop: 13,
+    color: "#5D6865",
+    fontSize: 15,
+  },
+
+  container: {
+    flex: 1,
+    justifyContent: "space-between",
+    paddingHorizontal: 28,
+    paddingTop: 90,
+    paddingBottom: 38,
+  },
+
+  content: {
+    alignItems: "center",
+  },
+
+  logo: {
+    fontSize: 82,
+  },
+
+  title: {
+    marginTop: 20,
+    color: "#176B5B",
+    fontSize: 31,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+
+  subtitle: {
+    marginTop: 16,
+    color: "#596762",
+    fontSize: 17,
+    lineHeight: 25,
+    textAlign: "center",
+  },
+
+  actions: {
+    gap: 14,
+  },
+
+  primaryButton: {
+    minHeight: 54,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    backgroundColor: "#176B5B",
+  },
+
+  primaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "bold",
+  },
+
+  secondaryButton: {
+    minHeight: 54,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "#176B5B",
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+  },
+
+  secondaryButtonText: {
+    color: "#176B5B",
+    fontSize: 17,
+    fontWeight: "bold",
+  },
+
+  buttonPressed: {
+    opacity: 0.8,
+  },
+});
