@@ -141,7 +141,7 @@ export default function InicioScreen() {
               pressed && styles.buttonPressed,
             ]}
             onPress={() => {
-              // Posteriormente abrirá el listado de pedidos.
+              router.push("../pedidos");
             }}
           >
             <Text style={styles.moduleIcon}>🛒</Text>
