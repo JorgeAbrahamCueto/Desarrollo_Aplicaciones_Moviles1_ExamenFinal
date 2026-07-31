@@ -170,7 +170,7 @@ export default function InicioScreen() {
 
         <View style={styles.welcomeCard}>
           <Text style={styles.welcomeTitle}>
-            Veterinaria Patitas
+            Veterinaria SumaqVet
           </Text>
 
           <Text style={styles.welcomeDescription}>

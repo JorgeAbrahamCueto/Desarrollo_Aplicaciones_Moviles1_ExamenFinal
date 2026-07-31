@@ -11,9 +11,9 @@ import {
   View,
 } from "react-native";
 
-import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { useSQLiteContext } from "expo-sqlite";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { obtenerUsuarioSesion } from "../../infrastructure/database/SesionRepository";
 
@@ -64,7 +64,7 @@ export default function BienvenidaScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingLogo}>🐾</Text>
+          <Text style={styles.loadingLogo}>🐶🐱</Text>
 
           <ActivityIndicator
             size="large"
@@ -86,12 +86,11 @@ export default function BienvenidaScreen() {
           <Text style={styles.logo}>🐾</Text>
 
           <Text style={styles.title}>
-            Veterinaria Patitas
+            Veterinaria SumaqVet
           </Text>
 
           <Text style={styles.subtitle}>
-            Cuidamos a tus mascotas y facilitamos la
-            gestión de atenciones y pedidos.
+            Donde cuidamos a nuestros amiguitos peludos como ellos nos cuidan.
           </Text>
         </View>
 

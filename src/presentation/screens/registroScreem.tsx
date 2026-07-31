@@ -1,3 +1,5 @@
+import { router } from "expo-router";
+import { useSQLiteContext } from "expo-sqlite";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -12,11 +14,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
-import { useSQLiteContext } from "expo-sqlite";
 
-import { registrarUsuario } from "../../infrastructure/database/UsuarioRepository";
 import { guardarSesion } from "../../infrastructure/database/SesionRepository";
+import { registrarUsuario } from "../../infrastructure/database/UsuarioRepository";
 import {
   formularioTieneErrores,
   RegistroErrors,
@@ -126,7 +126,7 @@ async function guardarUsuario() {
             <Text style={styles.backText}>‹ Volver</Text>
           </Pressable>
 
-          <Text style={styles.logo}>🐾</Text>
+          <Text style={styles.logo}>🐶🐱</Text>
 
           <Text style={styles.title}>
             Crear una cuenta
@@ -134,7 +134,7 @@ async function guardarUsuario() {
 
           <Text style={styles.subtitle}>
             Regístrate para gestionar las atenciones y
-            pedidos de Veterinaria Patitas.
+            pedidos de Veterinaria SumaqVet.
           </Text>
 
           <View style={styles.form}>
