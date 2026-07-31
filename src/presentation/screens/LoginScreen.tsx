@@ -1,4 +1,6 @@
+import { router } from "expo-router";
 import { useState } from "react";
+
 import {
   ActivityIndicator,
   Alert,
@@ -11,12 +13,14 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
-import { useSQLiteContext } from "expo-sqlite";
 
-import { autenticarUsuario } from "../../infrastructure/database/UsuarioRepository";
-import { guardarSesion } from "../../infrastructure/database/SesionRepository";
+import {
+  SafeAreaView,
+} from "react-native-safe-area-context";
+
+import {
+  iniciarSesionFirebase,
+} from "../../infrastructure/firebase/AuthService";
 
 import {
   validarLogin,
@@ -28,18 +32,28 @@ import type {
 } from "../../shared/validation/usuarioValidation";
 
 const INITIAL_FORM: LoginForm = {
-  nombreUsuario: "",
+  correo: "",
   password: "",
 };
 
 export default function LoginScreen() {
-  const database = useSQLiteContext();
+  const [form, setForm] =
+    useState<LoginForm>(
+      INITIAL_FORM
+    );
 
-  const [form, setForm] = useState<LoginForm>(INITIAL_FORM);
-  const [errores, setErrores] = useState<LoginErrors>({});
-  const [cargando, setCargando] = useState(false);
-  const [mostrarPassword, setMostrarPassword] =
-    useState(false);
+  const [errores, setErrores] =
+    useState<LoginErrors>({});
+
+  const [
+    cargando,
+    setCargando,
+  ] = useState(false);
+
+  const [
+    mostrarPassword,
+    setMostrarPassword,
+  ] = useState(false);
 
   function actualizarCampo(
     campo: keyof LoginForm,
@@ -50,139 +64,194 @@ export default function LoginScreen() {
       [campo]: valor,
     }));
 
-    setErrores((erroresActuales) => ({
-      ...erroresActuales,
-      [campo]: undefined,
-    }));
-  }
-
-async function iniciarSesion() {
-  const erroresEncontrados = validarLogin(form);
-
-  if (Object.keys(erroresEncontrados).length > 0) {
-    setErrores(erroresEncontrados);
-    return;
-  }
-
-  try {
-    setCargando(true);
-
-    const usuario = await autenticarUsuario(
-      database,
-      form.nombreUsuario,
-      form.password
+    setErrores(
+      (erroresActuales) => ({
+        ...erroresActuales,
+        [campo]: undefined,
+      })
     );
+  }
 
-    await guardarSesion(database, usuario.id);
+  async function iniciarSesion() {
+    const erroresEncontrados =
+      validarLogin(form);
 
-    const primerNombre =
-      usuario.nombres.trim().split(/\s+/)[0];
+    if (
+      Object.keys(
+        erroresEncontrados
+      ).length > 0
+    ) {
+      setErrores(
+        erroresEncontrados
+      );
 
-    Alert.alert(
-      "Inicio de sesión correcto",
-      `Bienvenido, ${primerNombre}`,
-      [
-        {
-          text: "Continuar",
-          onPress: () => {
-            router.replace("../inicio");
+      return;
+    }
+
+    try {
+      setCargando(true);
+
+      const usuario =
+        await iniciarSesionFirebase(
+          form.correo,
+          form.password
+        );
+
+      const primerNombre =
+        usuario.displayName
+          ?.trim()
+          .split(/\s+/)[0] ??
+        "Usuario";
+
+      Alert.alert(
+        "Inicio de sesión correcto",
+        `Bienvenido, ${primerNombre}`,
+        [
+          {
+            text: "Continuar",
+            onPress: () => {
+              router.replace(
+                "/inicio"
+              );
+            },
           },
-        },
-      ]
-    );
-  } catch (error) {
-    const mensaje =
-      error instanceof Error
-        ? error.message
-        : "No se pudo iniciar sesión";
+        ]
+      );
+    } catch (error) {
+      const mensaje =
+        error instanceof Error
+          ? error.message
+          : "No se pudo iniciar sesión";
 
-    Alert.alert("Error al iniciar sesión", mensaje);
-  } finally {
-    setCargando(false);
+      Alert.alert(
+        "Error al iniciar sesión",
+        mensaje
+      );
+    } finally {
+      setCargando(false);
+    }
   }
-}
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView
+      style={styles.safeArea}
+    >
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={
-          Platform.OS === "ios" ? "padding" : undefined
+          Platform.OS === "ios"
+            ? "padding"
+            : undefined
         }
       >
         <ScrollView
-          contentContainerStyle={styles.container}
+          contentContainerStyle={
+            styles.container
+          }
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+          showsVerticalScrollIndicator={
+            false
+          }
         >
           <Pressable
             style={({ pressed }) => [
               styles.backButton,
-              pressed && styles.buttonPressed,
+              pressed &&
+                styles.buttonPressed,
             ]}
-            onPress={() => router.back()}
+            onPress={() =>
+              router.back()
+            }
+            disabled={cargando}
           >
-            <Text style={styles.backText}>
+            <Text
+              style={styles.backText}
+            >
               ‹ Volver
             </Text>
           </Pressable>
 
           <View style={styles.header}>
-            <Text style={styles.logo}>🐾</Text>
+            <Text style={styles.logo}>
+              🐾
+            </Text>
 
             <Text style={styles.title}>
               Iniciar sesión
             </Text>
 
-            <Text style={styles.subtitle}>
-              Ingresa con el nombre de usuario y la
+            <Text
+              style={styles.subtitle}
+            >
+              Ingresa con el correo y la
               contraseña que registraste.
             </Text>
           </View>
 
           <View style={styles.form}>
-            <View style={styles.fieldContainer}>
-              <Text style={styles.label}>
-                Nombre de usuario
+            <View
+              style={
+                styles.fieldContainer
+              }
+            >
+              <Text
+                style={styles.label}
+              >
+                Correo electrónico
               </Text>
 
               <TextInput
                 style={[
                   styles.input,
-                  errores.nombreUsuario
+
+                  errores.correo
                     ? styles.inputError
                     : undefined,
                 ]}
-                placeholder="Ejemplo: jperez"
+                placeholder="Ejemplo: jperez@gmail.com"
                 placeholderTextColor="#8A9692"
-                value={form.nombreUsuario}
+                value={form.correo}
+                keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="next"
                 editable={!cargando}
-                onChangeText={(valor) =>
+                onChangeText={(
+                  valor
+                ) =>
                   actualizarCampo(
-                    "nombreUsuario",
+                    "correo",
                     valor
                   )
                 }
               />
 
-              {errores.nombreUsuario ? (
-                <Text style={styles.errorText}>
-                  {errores.nombreUsuario}
+              {errores.correo ? (
+                <Text
+                  style={
+                    styles.errorText
+                  }
+                >
+                  {errores.correo}
                 </Text>
               ) : null}
             </View>
 
-            <View style={styles.fieldContainer}>
-              <Text style={styles.label}>
+            <View
+              style={
+                styles.fieldContainer
+              }
+            >
+              <Text
+                style={styles.label}
+              >
                 Contraseña
               </Text>
 
               <TextInput
                 style={[
                   styles.input,
+
                   errores.password
                     ? styles.inputError
                     : undefined,
@@ -190,19 +259,32 @@ async function iniciarSesion() {
                 placeholder="Ingrese su contraseña"
                 placeholderTextColor="#8A9692"
                 value={form.password}
-                secureTextEntry={!mostrarPassword}
+                secureTextEntry={
+                  !mostrarPassword
+                }
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="done"
                 editable={!cargando}
-                onSubmitEditing={iniciarSesion}
-                onChangeText={(valor) =>
-                  actualizarCampo("password", valor)
+                onSubmitEditing={
+                  iniciarSesion
+                }
+                onChangeText={(
+                  valor
+                ) =>
+                  actualizarCampo(
+                    "password",
+                    valor
+                  )
                 }
               />
 
               {errores.password ? (
-                <Text style={styles.errorText}>
+                <Text
+                  style={
+                    styles.errorText
+                  }
+                >
                   {errores.password}
                 </Text>
               ) : null}
@@ -211,16 +293,22 @@ async function iniciarSesion() {
             <Pressable
               style={({ pressed }) => [
                 styles.showPasswordButton,
-                pressed && styles.buttonPressed,
+                pressed &&
+                  styles.buttonPressed,
               ]}
               onPress={() =>
                 setMostrarPassword(
-                  (valorActual) => !valorActual
+                  (valorActual) =>
+                    !valorActual
                 )
               }
               disabled={cargando}
             >
-              <Text style={styles.showPasswordText}>
+              <Text
+                style={
+                  styles.showPasswordText
+                }
+              >
                 {mostrarPassword
                   ? "Ocultar contraseña"
                   : "Mostrar contraseña"}
@@ -230,46 +318,78 @@ async function iniciarSesion() {
             <Pressable
               style={({ pressed }) => [
                 styles.primaryButton,
-                pressed && styles.buttonPressed,
-                cargando && styles.buttonDisabled,
+                pressed &&
+                  styles.buttonPressed,
+                cargando &&
+                  styles.buttonDisabled,
               ]}
               onPress={iniciarSesion}
               disabled={cargando}
             >
               {cargando ? (
-                <View style={styles.loadingContent}>
+                <View
+                  style={
+                    styles.loadingContent
+                  }
+                >
                   <ActivityIndicator
                     size="small"
                     color="#FFFFFF"
                   />
 
-                  <Text style={styles.primaryButtonText}>
+                  <Text
+                    style={
+                      styles.primaryButtonText
+                    }
+                  >
                     Ingresando...
                   </Text>
                 </View>
               ) : (
-                <Text style={styles.primaryButtonText}>
+                <Text
+                  style={
+                    styles.primaryButtonText
+                  }
+                >
                   Ingresar
                 </Text>
               )}
             </Pressable>
 
-            <View style={styles.registerContainer}>
-              <Text style={styles.registerQuestion}>
-                ¿Todavía no tienes una cuenta?
+            <View
+              style={
+                styles.registerContainer
+              }
+            >
+              <Text
+                style={
+                  styles.registerQuestion
+                }
+              >
+                ¿Todavía no tienes una
+                cuenta?
               </Text>
 
               <Pressable
-                style={({ pressed }) => [
+                style={({
+                  pressed,
+                }) => [
                   styles.registerButton,
-                  pressed && styles.buttonPressed,
+                  pressed &&
+                    styles.buttonPressed,
                 ]}
                 onPress={() =>
-                  router.push("/registro")
+                  router.push(
+                    "/registro"
+                  )
                 }
                 disabled={cargando}
               >
-                <Text style={styles.registerText}>
+                <Text
+                  style={
+                    styles.registerText
+                  }
+                >
                   Regístrate
                 </Text>
               </Pressable>
@@ -281,169 +401,170 @@ async function iniciarSesion() {
   );
 }
 
-const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-  },
-
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#F1F8F6",
-  },
-
-  container: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 14,
-    paddingBottom: 36,
-  },
-
-  backButton: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 4,
-    paddingVertical: 10,
-  },
-
-  backText: {
-    color: "#176B5B",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-
-  header: {
-    alignItems: "center",
-    marginTop: 30,
-  },
-
-  logo: {
-    fontSize: 60,
-  },
-
-  title: {
-    marginTop: 16,
-    color: "#176B5B",
-    fontSize: 29,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-
-  subtitle: {
-    maxWidth: 330,
-    marginTop: 10,
-    color: "#5D6865",
-    fontSize: 15,
-    lineHeight: 22,
-    textAlign: "center",
-  },
-
-  form: {
-    marginTop: 34,
-    padding: 22,
-    borderRadius: 20,
-    backgroundColor: "#FFFFFF",
-    elevation: 3,
-    shadowColor: "#000000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
+const styles =
+  StyleSheet.create({
+    flex: {
+      flex: 1,
     },
-    shadowOpacity: 0.12,
-    shadowRadius: 5,
-  },
 
-  fieldContainer: {
-    marginBottom: 18,
-  },
+    safeArea: {
+      flex: 1,
+      backgroundColor: "#F1F8F6",
+    },
 
-  label: {
-    marginBottom: 7,
-    color: "#26332F",
-    fontSize: 14,
-    fontWeight: "600",
-  },
+    container: {
+      flexGrow: 1,
+      paddingHorizontal: 24,
+      paddingTop: 14,
+      paddingBottom: 36,
+    },
 
-  input: {
-    minHeight: 50,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: "#CBD8D4",
-    borderRadius: 12,
-    color: "#1E2926",
-    backgroundColor: "#FAFCFB",
-    fontSize: 16,
-  },
+    backButton: {
+      alignSelf: "flex-start",
+      paddingHorizontal: 4,
+      paddingVertical: 10,
+    },
 
-  inputError: {
-    borderColor: "#C62828",
-    backgroundColor: "#FFF8F8",
-  },
+    backText: {
+      color: "#176B5B",
+      fontSize: 16,
+      fontWeight: "600",
+    },
 
-  errorText: {
-    marginTop: 5,
-    color: "#C62828",
-    fontSize: 13,
-  },
+    header: {
+      alignItems: "center",
+      marginTop: 30,
+    },
 
-  showPasswordButton: {
-    alignSelf: "flex-end",
-    marginTop: -4,
-    paddingVertical: 5,
-  },
+    logo: {
+      fontSize: 60,
+    },
 
-  showPasswordText: {
-    color: "#176B5B",
-    fontSize: 14,
-    fontWeight: "600",
-  },
+    title: {
+      marginTop: 16,
+      color: "#176B5B",
+      fontSize: 29,
+      fontWeight: "bold",
+      textAlign: "center",
+    },
 
-  primaryButton: {
-    minHeight: 52,
-    marginTop: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 14,
-    backgroundColor: "#176B5B",
-  },
+    subtitle: {
+      maxWidth: 330,
+      marginTop: 10,
+      color: "#5D6865",
+      fontSize: 15,
+      lineHeight: 22,
+      textAlign: "center",
+    },
 
-  primaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
+    form: {
+      marginTop: 34,
+      padding: 22,
+      borderRadius: 20,
+      backgroundColor: "#FFFFFF",
+      elevation: 3,
+      shadowColor: "#000000",
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 0.12,
+      shadowRadius: 5,
+    },
 
-  loadingContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
+    fieldContainer: {
+      marginBottom: 18,
+    },
 
-  registerContainer: {
-    marginTop: 24,
-    alignItems: "center",
-  },
+    label: {
+      marginBottom: 7,
+      color: "#26332F",
+      fontSize: 14,
+      fontWeight: "600",
+    },
 
-  registerQuestion: {
-    color: "#64716D",
-    fontSize: 14,
-  },
+    input: {
+      minHeight: 50,
+      paddingHorizontal: 14,
+      borderWidth: 1,
+      borderColor: "#CBD8D4",
+      borderRadius: 12,
+      color: "#1E2926",
+      backgroundColor: "#FAFCFB",
+      fontSize: 16,
+    },
 
-  registerButton: {
-    marginTop: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
+    inputError: {
+      borderColor: "#C62828",
+      backgroundColor: "#FFF8F8",
+    },
 
-  registerText: {
-    color: "#176B5B",
-    fontSize: 15,
-    fontWeight: "bold",
-  },
+    errorText: {
+      marginTop: 5,
+      color: "#C62828",
+      fontSize: 13,
+    },
 
-  buttonPressed: {
-    opacity: 0.78,
-  },
+    showPasswordButton: {
+      alignSelf: "flex-end",
+      marginTop: -4,
+      paddingVertical: 5,
+    },
 
-  buttonDisabled: {
-    opacity: 0.65,
-  },
-});
+    showPasswordText: {
+      color: "#176B5B",
+      fontSize: 14,
+      fontWeight: "600",
+    },
+
+    primaryButton: {
+      minHeight: 52,
+      marginTop: 22,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 14,
+      backgroundColor: "#176B5B",
+    },
+
+    primaryButtonText: {
+      color: "#FFFFFF",
+      fontSize: 16,
+      fontWeight: "bold",
+    },
+
+    loadingContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+
+    registerContainer: {
+      marginTop: 24,
+      alignItems: "center",
+    },
+
+    registerQuestion: {
+      color: "#64716D",
+      fontSize: 14,
+    },
+
+    registerButton: {
+      marginTop: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+    },
+
+    registerText: {
+      color: "#176B5B",
+      fontSize: 15,
+      fontWeight: "bold",
+    },
+
+    buttonPressed: {
+      opacity: 0.78,
+    },
+
+    buttonDisabled: {
+      opacity: 0.65,
+    },
+  });

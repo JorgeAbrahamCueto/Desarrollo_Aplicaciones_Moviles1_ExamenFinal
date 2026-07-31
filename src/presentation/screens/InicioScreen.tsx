@@ -1,8 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useState,
-} from "react";
+import { useEffect, useState } from "react";
 
 import {
   ActivityIndicator,
@@ -14,57 +10,46 @@ import {
   View,
 } from "react-native";
 
-import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { useSQLiteContext } from "expo-sqlite";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import type { Usuario } from "../../domain/models/Usuario";
-
-import {
-  cerrarSesion,
-  obtenerUsuarioSesion,
-} from "../../infrastructure/database/SesionRepository";
+import { cerrarSesionFirebase } from "../../infrastructure/firebase/AuthService";
+import { useAuth } from "../context/AuthContext";
 
 export default function InicioScreen() {
-  const database = useSQLiteContext();
+  const {
+    usuario,
+    perfil,
+    cargandoSesion,
+  } = useAuth();
 
-  const [usuario, setUsuario] =
-    useState<Usuario | null>(null);
-
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState("");
-
-  const cargarSesion = useCallback(async () => {
-    try {
-      setCargando(true);
-      setError("");
-
-      const usuarioSesion =
-        await obtenerUsuarioSesion(database);
-
-      if (!usuarioSesion) {
-        router.replace("/");
-        return;
-      }
-
-      setUsuario(usuarioSesion);
-    } catch (caughtError) {
-      console.error(
-        "Error al recuperar la sesión:",
-        caughtError
-      );
-
-      setError(
-        "No se pudo recuperar la información del usuario"
-      );
-    } finally {
-      setCargando(false);
-    }
-  }, [database]);
+  const [cerrandoSesion, setCerrandoSesion] =
+    useState(false);
 
   useEffect(() => {
-    cargarSesion();
-  }, [cargarSesion]);
+    if (!cargandoSesion && !usuario) {
+      router.replace("/");
+    }
+  }, [cargandoSesion, usuario]);
+
+  async function ejecutarCierreSesion() {
+    try {
+      setCerrandoSesion(true);
+
+      await cerrarSesionFirebase();
+
+      router.replace("/");
+    } catch (error) {
+      const mensaje =
+        error instanceof Error
+          ? error.message
+          : "No se pudo cerrar la sesión";
+
+      Alert.alert("Error", mensaje);
+    } finally {
+      setCerrandoSesion(false);
+    }
+  }
 
   function confirmarCerrarSesion() {
     Alert.alert(
@@ -78,29 +63,13 @@ export default function InicioScreen() {
         {
           text: "Cerrar sesión",
           style: "destructive",
-          onPress: async () => {
-            try {
-              await cerrarSesion(database);
-
-              router.replace("/");
-            } catch (caughtError) {
-              console.error(
-                "Error al cerrar sesión:",
-                caughtError
-              );
-
-              Alert.alert(
-                "Error",
-                "No se pudo cerrar la sesión"
-              );
-            }
-          },
+          onPress: ejecutarCierreSesion,
         },
       ]
     );
   }
 
-  if (cargando) {
+  if (cargandoSesion || !usuario) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.centerContainer}>
@@ -117,36 +86,18 @@ export default function InicioScreen() {
     );
   }
 
-  if (error) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.centerContainer}>
-          <Text style={styles.errorTitle}>
-            Ocurrió un problema
-          </Text>
-
-          <Text style={styles.errorText}>
-            {error}
-          </Text>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.retryButton,
-              pressed && styles.buttonPressed,
-            ]}
-            onPress={cargarSesion}
-          >
-            <Text style={styles.retryButtonText}>
-              Reintentar
-            </Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   const primerNombre =
-    usuario?.nombres.trim().split(/\s+/)[0] ?? "";
+    perfil?.nombres
+      ?.trim()
+      .split(/\s+/)[0] ??
+    usuario.displayName
+      ?.trim()
+      .split(/\s+/)[0] ??
+    "Usuario";
+
+  const identificador = perfil?.nombreUsuario
+    ? `@${perfil.nombreUsuario}`
+    : usuario.email ?? "";
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -155,13 +106,13 @@ export default function InicioScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <View>
+          <View style={styles.headerInformation}>
             <Text style={styles.greeting}>
               Bienvenido, {primerNombre}
             </Text>
 
             <Text style={styles.username}>
-              @{usuario?.nombreUsuario}
+              {identificador}
             </Text>
           </View>
 
@@ -170,12 +121,12 @@ export default function InicioScreen() {
 
         <View style={styles.welcomeCard}>
           <Text style={styles.welcomeTitle}>
-            Veterinaria SumaqVet
+            SumaqVet
           </Text>
 
           <Text style={styles.welcomeDescription}>
-            Gestiona las atenciones veterinarias y los
-            pedidos de productos para mascotas.
+            Gestiona atenciones veterinarias, pedidos y
+            productos para mascotas.
           </Text>
         </View>
 
@@ -184,7 +135,15 @@ export default function InicioScreen() {
         </Text>
 
         <View style={styles.modulesContainer}>
-          <View style={styles.moduleCard}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.moduleCard,
+              pressed && styles.buttonPressed,
+            ]}
+            onPress={() => {
+              // Posteriormente abrirá el listado de pedidos.
+            }}
+          >
             <Text style={styles.moduleIcon}>🛒</Text>
 
             <View style={styles.moduleInformation}>
@@ -193,13 +152,23 @@ export default function InicioScreen() {
               </Text>
 
               <Text style={styles.moduleDescription}>
-                Registrar, consultar, editar y eliminar
+                Registrar, consultar, actualizar y eliminar
                 pedidos.
               </Text>
             </View>
-          </View>
 
-          <View style={styles.moduleCard}>
+            <Text style={styles.arrow}>›</Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.moduleCard,
+              pressed && styles.buttonPressed,
+            ]}
+            onPress={() => {
+              // Posteriormente abrirá atenciones.
+            }}
+          >
             <Text style={styles.moduleIcon}>🩺</Text>
 
             <View style={styles.moduleInformation}>
@@ -211,9 +180,19 @@ export default function InicioScreen() {
                 Gestionar las atenciones de las mascotas.
               </Text>
             </View>
-          </View>
 
-          <View style={styles.moduleCard}>
+            <Text style={styles.arrow}>›</Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.moduleCard,
+              pressed && styles.buttonPressed,
+            ]}
+            onPress={() => {
+              // Posteriormente abrirá el catálogo REST.
+            }}
+          >
             <Text style={styles.moduleIcon}>🐶</Text>
 
             <View style={styles.moduleInformation}>
@@ -222,13 +201,23 @@ export default function InicioScreen() {
               </Text>
 
               <Text style={styles.moduleDescription}>
-                Consultar información externa desde una
-                API REST.
+                Consultar información mediante una API
+                REST real.
               </Text>
             </View>
-          </View>
 
-          <View style={styles.moduleCard}>
+            <Text style={styles.arrow}>›</Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.moduleCard,
+              pressed && styles.buttonPressed,
+            ]}
+            onPress={() => {
+              // Posteriormente abrirá el perfil.
+            }}
+          >
             <Text style={styles.moduleIcon}>👤</Text>
 
             <View style={styles.moduleInformation}>
@@ -237,22 +226,39 @@ export default function InicioScreen() {
               </Text>
 
               <Text style={styles.moduleDescription}>
-                Ver los datos del usuario registrado.
+                Consultar los datos de la cuenta.
               </Text>
             </View>
-          </View>
+
+            <Text style={styles.arrow}>›</Text>
+          </Pressable>
         </View>
 
         <Pressable
           style={({ pressed }) => [
             styles.logoutButton,
             pressed && styles.buttonPressed,
+            cerrandoSesion && styles.buttonDisabled,
           ]}
           onPress={confirmarCerrarSesion}
+          disabled={cerrandoSesion}
         >
-          <Text style={styles.logoutButtonText}>
-            Cerrar sesión
-          </Text>
+          {cerrandoSesion ? (
+            <View style={styles.loadingButtonContent}>
+              <ActivityIndicator
+                size="small"
+                color="#B42318"
+              />
+
+              <Text style={styles.logoutButtonText}>
+                Cerrando sesión...
+              </Text>
+            </View>
+          ) : (
+            <Text style={styles.logoutButtonText}>
+              Cerrar sesión
+            </Text>
+          )}
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -285,40 +291,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
 
-  errorTitle: {
-    color: "#B42318",
-    fontSize: 21,
-    fontWeight: "bold",
-  },
-
-  errorText: {
-    marginTop: 10,
-    color: "#5D6865",
-    fontSize: 15,
-    lineHeight: 22,
-    textAlign: "center",
-  },
-
-  retryButton: {
-    minHeight: 48,
-    marginTop: 24,
-    paddingHorizontal: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 13,
-    backgroundColor: "#176B5B",
-  },
-
-  retryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "bold",
-  },
-
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+
+  headerInformation: {
+    flex: 1,
+    paddingRight: 12,
   },
 
   greeting: {
@@ -343,6 +324,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: "#176B5B",
     elevation: 3,
+    shadowColor: "#000000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.12,
+    shadowRadius: 5,
   },
 
   welcomeTitle: {
@@ -378,6 +366,13 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: "#FFFFFF",
     elevation: 2,
+    shadowColor: "#000000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
   },
 
   moduleIcon: {
@@ -404,6 +399,13 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
 
+  arrow: {
+    marginLeft: 8,
+    color: "#176B5B",
+    fontSize: 29,
+    fontWeight: "400",
+  },
+
   logoutButton: {
     minHeight: 51,
     marginTop: 30,
@@ -421,7 +423,17 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 
+  loadingButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
   buttonPressed: {
     opacity: 0.78,
+  },
+
+  buttonDisabled: {
+    opacity: 0.6,
   },
 });

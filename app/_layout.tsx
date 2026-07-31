@@ -3,9 +3,8 @@ import { SQLiteProvider } from "expo-sqlite";
 
 import { initializeDatabase } from "../src/infrastructure/database/database";
 
-/*
- * Este import inicializa Firebase cuando abre la aplicación.
- */
+import { AuthProvider } from "../src/presentation/context/AuthContext";
+
 import "../src/infrastructure/firebase/firebaseConfig";
 
 export default function RootLayout() {
@@ -20,11 +19,13 @@ export default function RootLayout() {
         );
       }}
     >
-      <Stack
-        screenOptions={{
-          headerShown: false,
-        }}
-      />
+      <AuthProvider>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+          }}
+        />
+      </AuthProvider>
     </SQLiteProvider>
   );
 }

@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getFirestore } from "firebase/firestore";
 
 import {
   getApp,
@@ -86,3 +87,4 @@ function inicializarAuth(): Auth {
 }
 
 export const auth = inicializarAuth();
+export const db = getFirestore(firebaseApp);

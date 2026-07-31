@@ -1,7 +1,4 @@
-import {
-  useEffect,
-  useState,
-} from "react";
+import { useEffect } from "react";
 
 import {
   ActivityIndicator,
@@ -12,59 +9,27 @@ import {
 } from "react-native";
 
 import { router } from "expo-router";
-import { useSQLiteContext } from "expo-sqlite";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { obtenerUsuarioSesion } from "../../infrastructure/database/SesionRepository";
+import { useAuth } from "../context/AuthContext";
 
 export default function BienvenidaScreen() {
-  const database = useSQLiteContext();
-
-  const [verificandoSesion, setVerificandoSesion] =
-    useState(true);
+  const {
+    usuario,
+    cargandoSesion,
+  } = useAuth();
 
   useEffect(() => {
-    let pantallaActiva = true;
-
-    async function verificarSesion() {
-      try {
-        const usuario =
-          await obtenerUsuarioSesion(database);
-
-        if (!pantallaActiva) {
-          return;
-        }
-
-        if (usuario) {
-          router.replace("/inicio");
-          return;
-        }
-
-        setVerificandoSesion(false);
-      } catch (error) {
-        console.error(
-          "Error al verificar la sesión:",
-          error
-        );
-
-        if (pantallaActiva) {
-          setVerificandoSesion(false);
-        }
-      }
+    if (!cargandoSesion && usuario) {
+      router.replace("/inicio");
     }
+  }, [cargandoSesion, usuario]);
 
-    verificarSesion();
-
-    return () => {
-      pantallaActiva = false;
-    };
-  }, [database]);
-
-  if (verificandoSesion) {
+  if (cargandoSesion || usuario) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingLogo}>🐶🐱</Text>
+          <Text style={styles.loadingLogo}>🐾</Text>
 
           <ActivityIndicator
             size="large"
@@ -90,7 +55,8 @@ export default function BienvenidaScreen() {
           </Text>
 
           <Text style={styles.subtitle}>
-            Donde cuidamos a nuestros amiguitos peludos como ellos nos cuidan.
+            Donde cuidamos a nuestros amiguitos peludos
+            como ellos nos cuidan.
           </Text>
         </View>
 
