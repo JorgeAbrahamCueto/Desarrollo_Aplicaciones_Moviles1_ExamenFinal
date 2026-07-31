@@ -148,7 +148,7 @@ export default function InicioScreen() {
 
             <View style={styles.moduleInformation}>
               <Text style={styles.moduleTitle}>
-                Pedidos
+                Mis Pedidos
               </Text>
 
               <Text style={styles.moduleDescription}>
@@ -190,19 +190,20 @@ export default function InicioScreen() {
               pressed && styles.buttonPressed,
             ]}
             onPress={() => {
-              // Posteriormente abrirá el catálogo REST.
+              router.push("../productos");
             }}
           >
-            <Text style={styles.moduleIcon}>🐶</Text>
+            <Text style={styles.moduleIcon}>
+              🛍️
+            </Text>
 
             <View style={styles.moduleInformation}>
               <Text style={styles.moduleTitle}>
-                Catálogo
+                Productos
               </Text>
 
               <Text style={styles.moduleDescription}>
-                Consultar información mediante una API
-                REST real.
+                Explorar productos y realizar pedidos.
               </Text>
             </View>
 

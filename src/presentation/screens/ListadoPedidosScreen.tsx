@@ -69,10 +69,11 @@ export default function ListadoPedidosScreen() {
 
         setError("");
 
-        const resultado = await listarPedidos(
-          database,
-          usuario.uid
-        );
+        const resultado =
+          await listarPedidos(
+            database,
+            usuario.uid
+          );
 
         setPedidos(resultado);
       } catch (caughtError) {
@@ -82,14 +83,17 @@ export default function ListadoPedidosScreen() {
         );
 
         setError(
-          "No se pudieron cargar los pedidos"
+          "No se pudieron cargar tus pedidos"
         );
       } finally {
         setCargando(false);
         setActualizando(false);
       }
     },
-    [database, usuario]
+    [
+      database,
+      usuario,
+    ]
   );
 
   useFocusEffect(
@@ -115,7 +119,7 @@ export default function ListadoPedidosScreen() {
           />
 
           <Text style={styles.loadingText}>
-            Cargando pedidos...
+            Cargando tus pedidos...
           </Text>
         </View>
       </SafeAreaView>
@@ -131,7 +135,7 @@ export default function ListadoPedidosScreen() {
           </Text>
 
           <Text style={styles.errorTitle}>
-            No pudimos cargar los pedidos
+            No pudimos cargar tus pedidos
           </Text>
 
           <Text style={styles.errorMessage}>
@@ -141,11 +145,16 @@ export default function ListadoPedidosScreen() {
           <Pressable
             style={({ pressed }) => [
               styles.retryButton,
-              pressed && styles.buttonPressed,
+              pressed &&
+                styles.buttonPressed,
             ]}
-            onPress={() => cargarPedidos()}
+            onPress={() =>
+              cargarPedidos()
+            }
           >
-            <Text style={styles.retryButtonText}>
+            <Text
+              style={styles.retryButtonText}
+            >
               Reintentar
             </Text>
           </Pressable>
@@ -154,7 +163,9 @@ export default function ListadoPedidosScreen() {
             style={styles.backErrorButton}
             onPress={() => router.back()}
           >
-            <Text style={styles.backErrorText}>
+            <Text
+              style={styles.backErrorText}
+            >
               Volver al inicio
             </Text>
           </Pressable>
@@ -169,7 +180,8 @@ export default function ListadoPedidosScreen() {
         <Pressable
           style={({ pressed }) => [
             styles.backButton,
-            pressed && styles.buttonPressed,
+            pressed &&
+              styles.buttonPressed,
           ]}
           onPress={() => router.back()}
         >
@@ -178,9 +190,13 @@ export default function ListadoPedidosScreen() {
           </Text>
         </Pressable>
 
-        <View style={styles.headerTextContainer}>
+        <View
+          style={
+            styles.headerTextContainer
+          }
+        >
           <Text style={styles.title}>
-            Pedidos
+            Mis pedidos
           </Text>
 
           <Text style={styles.subtitle}>
@@ -212,7 +228,9 @@ export default function ListadoPedidosScreen() {
         }
       >
         {pedidos.length === 0 ? (
-          <View style={styles.emptyContainer}>
+          <View
+            style={styles.emptyContainer}
+          >
             <Text style={styles.emptyIcon}>
               📦
             </Text>
@@ -221,27 +239,39 @@ export default function ListadoPedidosScreen() {
               Todavía no tienes pedidos
             </Text>
 
-            <Text style={styles.emptyDescription}>
-              Registra el primer pedido para comenzar
-              a gestionar las ventas de SumaqVet.
+            <Text
+              style={
+                styles.emptyDescription
+              }
+            >
+              Explora el catálogo de SumaqVet,
+              selecciona un producto y realiza
+              tu primer pedido.
             </Text>
 
             <Pressable
               style={({ pressed }) => [
                 styles.emptyButton,
-                pressed && styles.buttonPressed,
+                pressed &&
+                  styles.buttonPressed,
               ]}
               onPress={() =>
-                router.push("../pedidos/crear")
+                router.push("/productos")
               }
             >
-              <Text style={styles.emptyButtonText}>
-                Crear primer pedido
+              <Text
+                style={
+                  styles.emptyButtonText
+                }
+              >
+                Explorar productos
               </Text>
             </Pressable>
           </View>
         ) : (
-          <View style={styles.listContainer}>
+          <View
+            style={styles.listContainer}
+          >
             {pedidos.map((pedido) => (
               <PedidoCard
                 key={pedido.id}
@@ -256,18 +286,27 @@ export default function ListadoPedidosScreen() {
         <Pressable
           style={({ pressed }) => [
             styles.floatingButton,
-            pressed && styles.buttonPressed,
+            pressed &&
+              styles.buttonPressed,
           ]}
           onPress={() =>
-            router.push("../pedidos/crear")
+            router.push("/productos")
           }
         >
-          <Text style={styles.floatingButtonIcon}>
+          <Text
+            style={
+              styles.floatingButtonIcon
+            }
+          >
             ＋
           </Text>
 
-          <Text style={styles.floatingButtonText}>
-            Nuevo pedido
+          <Text
+            style={
+              styles.floatingButtonText
+            }
+          >
+            Comprar productos
           </Text>
         </Pressable>
       ) : null}
@@ -286,9 +325,26 @@ function PedidoCard({
     pedido.cantidad * pedido.precio;
 
   return (
-    <View style={styles.card}>
+    <Pressable
+      style={({ pressed }) => [
+        styles.card,
+        pressed && styles.cardPressed,
+      ]}
+      onPress={() =>
+        router.push({
+          pathname: "../pedidos/[id]",
+          params: {
+            id: pedido.id.toString(),
+          },
+        })
+      }
+    >
       <View style={styles.cardHeader}>
-        <View style={styles.cardTitleContainer}>
+        <View
+          style={
+            styles.cardTitleContainer
+          }
+        >
           <Text
             style={styles.cardProduct}
             numberOfLines={1}
@@ -301,7 +357,9 @@ function PedidoCard({
           </Text>
         </View>
 
-        <EstadoBadge estado={pedido.estado} />
+        <EstadoBadge
+          estado={pedido.estado}
+        />
       </View>
 
       <View style={styles.cardDivider} />
@@ -349,14 +407,18 @@ function PedidoCard({
         </Text>
       </View>
 
-      <View style={styles.syncContainer}>
+      <View style={styles.cardFooter}>
         <Text style={styles.syncText}>
           {pedido.sincronizado
             ? "☁️ Sincronizado"
             : "📱 Guardado localmente"}
         </Text>
+
+        <Text style={styles.detailText}>
+          Ver detalle ›
+        </Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -373,16 +435,19 @@ function EstadoBadge({
       fondo: "#FFF4CC",
       color: "#855C00",
     },
+
     EN_PROCESO: {
       texto: "En proceso",
       fondo: "#DCEEFF",
       color: "#175A8C",
     },
+
     ENTREGADO: {
       texto: "Entregado",
       fondo: "#DDF6E8",
       color: "#176B43",
     },
+
     CANCELADO: {
       texto: "Cancelado",
       fondo: "#FDE2E1",
@@ -404,7 +469,8 @@ function EstadoBadge({
         style={[
           styles.badgeText,
           {
-            color: configuracion.color,
+            color:
+              configuracion.color,
           },
         ]}
       >
@@ -589,6 +655,10 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
 
+  cardPressed: {
+    opacity: 0.76,
+  },
+
   cardHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -668,13 +738,22 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 
-  syncContainer: {
+  cardFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginTop: 13,
   },
 
   syncText: {
     color: "#71807A",
     fontSize: 12,
+  },
+
+  detailText: {
+    color: "#176B5B",
+    fontSize: 12,
+    fontWeight: "bold",
   },
 
   floatingButton: {

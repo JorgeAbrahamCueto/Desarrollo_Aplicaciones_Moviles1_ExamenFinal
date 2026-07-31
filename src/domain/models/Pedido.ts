@@ -10,6 +10,7 @@ export type EstadoPedido =
 
 export interface Pedido {
   id: number;
+  productoId: number | null;
   firebaseId: string | null;
   usuarioUid: string;
   clienteNombre: string;
@@ -23,6 +24,7 @@ export interface Pedido {
 }
 
 export interface CrearPedidoData {
+  productoId?: number | null;
   usuarioUid: string;
   clienteNombre: string;
   producto: string;

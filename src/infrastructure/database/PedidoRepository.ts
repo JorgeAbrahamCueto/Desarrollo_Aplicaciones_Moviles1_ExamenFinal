@@ -9,6 +9,7 @@ import type {
 
 interface PedidoRow {
   id: number;
+  productoId: number | null;
   firebaseId: string | null;
   usuarioUid: string;
   clienteNombre: string;
@@ -24,6 +25,7 @@ interface PedidoRow {
 function convertirRowAPedido(row: PedidoRow): Pedido {
   return {
     id: row.id,
+    productoId: row.productoId,
     firebaseId: row.firebaseId,
     usuarioUid: row.usuarioUid,
     clienteNombre: row.clienteNombre,
@@ -44,52 +46,60 @@ export async function crearPedido(
   database: SQLiteDatabase,
   data: CrearPedidoData
 ): Promise<Pedido> {
-  const fechaActual = new Date().toISOString();
+  const fechaActual =
+    new Date().toISOString();
 
-  const resultado = await database.runAsync(
-    `
-      INSERT INTO pedidos (
-        firebaseId,
-        usuarioUid,
-        clienteNombre,
-        producto,
-        cantidad,
-        precio,
-        estado,
-        fechaRegistro,
-        fechaActualizacion,
-        sincronizado
-      )
-      VALUES (
-        NULL,
-        ?,
-        ?,
-        ?,
-        ?,
-        ?,
-        ?,
-        ?,
-        ?,
-        0
-      )
-    `,
-    [
-      data.usuarioUid,
-      data.clienteNombre.trim(),
-      data.producto.trim(),
-      data.cantidad,
-      data.precio,
-      data.estado,
-      fechaActual,
-      fechaActual,
-    ]
-  );
+  const resultado =
+    await database.runAsync(
+      `
+        INSERT INTO pedidos (
+          productoId,
+          firebaseId,
+          usuarioUid,
+          clienteNombre,
+          producto,
+          cantidad,
+          precio,
+          estado,
+          fechaRegistro,
+          fechaActualizacion,
+          sincronizado
+        )
+        VALUES (
+          ?,
+          NULL,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          0
+        )
+      `,
+      [
+        data.productoId ?? null,
+        data.usuarioUid,
+        data.clienteNombre.trim(),
+        data.producto.trim(),
+        data.cantidad,
+        data.precio,
+        data.estado,
+        fechaActual,
+        fechaActual,
+      ]
+    );
 
-  const pedidoCreado = await obtenerPedidoPorId(
-    database,
-    Number(resultado.lastInsertRowId),
-    data.usuarioUid
-  );
+  const pedidoCreado =
+    await obtenerPedidoPorId(
+      database,
+      Number(
+        resultado.lastInsertRowId
+      ),
+      data.usuarioUid
+    );
 
   if (!pedidoCreado) {
     throw new Error(
@@ -112,6 +122,7 @@ export async function listarPedidos(
     `
       SELECT
         id,
+        productoId,
         firebaseId,
         usuarioUid,
         clienteNombre,
@@ -145,6 +156,7 @@ export async function obtenerPedidoPorId(
     `
       SELECT
         id,
+        productoId,
         firebaseId,
         usuarioUid,
         clienteNombre,
