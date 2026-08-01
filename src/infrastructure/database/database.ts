@@ -2,7 +2,7 @@ import type {
   SQLiteDatabase,
 } from "expo-sqlite";
 
-const DATABASE_VERSION = 7;
+const DATABASE_VERSION = 8;
 
 interface TableInfoRow {
   name: string;
@@ -205,25 +205,74 @@ export async function initializeDatabase(
     ON productos(activo);
   `);
 
-  /*
- * Cola para eliminar posteriormente de Firestore
- * pedidos borrados mientras no había Internet.
+  
+/*
+ * Reservas de atenciones veterinarias.
+ * Cada atención pertenece a una cuenta Firebase.
  */
 await database.execAsync(`
-  CREATE TABLE IF NOT EXISTS
-    eliminaciones_pendientes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+  CREATE TABLE IF NOT EXISTS atenciones (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-      firebaseId TEXT NOT NULL UNIQUE,
+    usuarioUid TEXT NOT NULL,
 
-      usuarioUid TEXT NOT NULL,
+    propietarioNombre TEXT NOT NULL,
 
-      fechaRegistro TEXT NOT NULL
-    );
+    mascotaNombre TEXT NOT NULL,
+
+    especie TEXT NOT NULL
+      CHECK (
+        especie IN (
+          'PERRO',
+          'GATO',
+          'OTRO'
+        )
+      ),
+
+    tipoAtencion TEXT NOT NULL
+      CHECK (
+        tipoAtencion IN (
+          'CONSULTA_GENERAL',
+          'VACUNACION',
+          'DESPARASITACION',
+          'CONTROL',
+          'EMERGENCIA'
+        )
+      ),
+
+    fechaAtencion TEXT NOT NULL,
+
+    horaAtencion TEXT NOT NULL,
+
+    motivo TEXT NOT NULL,
+
+    estado TEXT NOT NULL
+      DEFAULT 'SOLICITADA'
+      CHECK (
+        estado IN (
+          'SOLICITADA',
+          'CONFIRMADA',
+          'ATENDIDA',
+          'CANCELADA'
+        )
+      ),
+
+    fechaRegistro TEXT NOT NULL,
+
+    fechaActualizacion TEXT NOT NULL
+  );
 
   CREATE INDEX IF NOT EXISTS
-    idx_eliminaciones_usuario
-  ON eliminaciones_pendientes(usuarioUid);
+    idx_atenciones_usuario
+  ON atenciones(usuarioUid);
+
+  CREATE INDEX IF NOT EXISTS
+    idx_atenciones_estado
+  ON atenciones(estado);
+
+  CREATE INDEX IF NOT EXISTS
+    idx_atenciones_fecha
+  ON atenciones(fechaAtencion);
 `);
 
   await database.execAsync(

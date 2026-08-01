@@ -166,7 +166,7 @@ export default function InicioScreen() {
               pressed && styles.buttonPressed,
             ]}
             onPress={() => {
-              // Posteriormente abrirá atenciones.
+              router.push("../atenciones");
             }}
           >
             <Text style={styles.moduleIcon}>🩺</Text>
