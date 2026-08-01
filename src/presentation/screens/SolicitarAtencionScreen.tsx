@@ -60,11 +60,11 @@ const INITIAL_FORM: AtencionForm = {
   motivo: "",
 };
 
-const ESPECIES: Array<{
+const ESPECIES: {
   value: EspecieMascota;
   label: string;
   icon: string;
-}> = [
+}[] = [
   {
     value: "PERRO",
     label: "Perro",
@@ -82,11 +82,11 @@ const ESPECIES: Array<{
   },
 ];
 
-const SERVICIOS: Array<{
+const SERVICIOS: {
   value: TipoAtencion;
   label: string;
   icon: string;
-}> = [
+}[] = [
   {
     value: "CONSULTA_GENERAL",
     label: "Consulta general",
