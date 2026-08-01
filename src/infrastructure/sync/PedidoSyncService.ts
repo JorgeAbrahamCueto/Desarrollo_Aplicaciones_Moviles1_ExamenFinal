@@ -8,6 +8,7 @@ import type {
 import {
   asegurarFirebaseId,
   completarEliminacionPendiente,
+  guardarPedidoRemotoEnSQLite,
   listarEliminacionesPendientes,
   listarPedidosPendientes,
   marcarPedidoSincronizado,
@@ -16,12 +17,16 @@ import {
 import {
   eliminarPedidoFirestore,
   guardarPedidoFirestore,
+  obtenerPedidosFirestore,
 } from "../firebase/PedidoFirebaseService";
+
+
 
 export interface ResultadoSincronizacion {
   conectado: boolean;
   pedidosSincronizados: number;
   pedidosEliminados: number;
+  pedidosDescargados: number;
   errores: number;
 }
 
@@ -36,7 +41,7 @@ const sincronizacionesActivas =
   >();
 
 async function comprobarConexion():
-Promise<boolean> {
+  Promise<boolean> {
   const estado = await NetInfo.fetch();
 
   if (!estado.isConnected) {
@@ -59,6 +64,7 @@ async function ejecutarSincronizacion(
     conectado: false,
     pedidosSincronizados: 0,
     pedidosEliminados: 0,
+    pedidosDescargados: 0,
     errores: 0,
   };
 
@@ -155,6 +161,74 @@ async function ejecutarSincronizacion(
         error
       );
     }
+  }
+
+  /*
+ * Descarga los pedidos del usuario desde Firestore.
+ * Esto recupera los pedidos en instalaciones nuevas.
+ */
+  try {
+    const eliminacionesRestantes =
+      await listarEliminacionesPendientes(
+        database,
+        usuarioUid
+      );
+
+    const idsPendientesDeEliminar =
+      new Set(
+        eliminacionesRestantes.map(
+          (eliminacion) =>
+            eliminacion.firebaseId
+        )
+      );
+
+    const pedidosRemotos =
+      await obtenerPedidosFirestore(
+        usuarioUid
+      );
+
+    for (const pedidoRemoto of pedidosRemotos) {
+      /*
+       * No restauramos un pedido que el usuario
+       * eliminó localmente y aún espera sincronización.
+       */
+      if (
+        idsPendientesDeEliminar.has(
+          pedidoRemoto.firebaseId
+        )
+      ) {
+        continue;
+      }
+
+      try {
+        const accion =
+          await guardarPedidoRemotoEnSQLite(
+            database,
+            pedidoRemoto
+          );
+
+        if (
+          accion === "insertado" ||
+          accion === "actualizado"
+        ) {
+          resultado.pedidosDescargados += 1;
+        }
+      } catch (error) {
+        resultado.errores += 1;
+
+        console.error(
+          `No se pudo guardar localmente el pedido ${pedidoRemoto.firebaseId}:`,
+          error
+        );
+      }
+    }
+  } catch (error) {
+    resultado.errores += 1;
+
+    console.error(
+      "No se pudieron descargar los pedidos de Firestore:",
+      error
+    );
   }
 
   console.log(

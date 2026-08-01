@@ -38,6 +38,10 @@ import {
   useAuth,
 } from "../context/AuthContext";
 
+import {
+  sincronizarPedidos,
+} from "../../infrastructure/sync/PedidoSyncService";
+
 export default function ListadoPedidosScreen() {
   const database = useSQLiteContext();
   const { usuario } = useAuth();
@@ -62,12 +66,26 @@ export default function ListadoPedidosScreen() {
         return;
       }
 
+
+
       try {
         if (mostrarCarga) {
           setCargando(true);
         }
 
         setError("");
+
+        try {
+          await sincronizarPedidos(
+            database,
+            usuario.uid
+          );
+        } catch (syncError) {
+          console.warn(
+            "No se pudo sincronizar antes de listar:",
+            syncError
+          );
+        }
 
         const resultado =
           await listarPedidos(
@@ -146,7 +164,7 @@ export default function ListadoPedidosScreen() {
             style={({ pressed }) => [
               styles.retryButton,
               pressed &&
-                styles.buttonPressed,
+              styles.buttonPressed,
             ]}
             onPress={() =>
               cargarPedidos()
@@ -181,7 +199,7 @@ export default function ListadoPedidosScreen() {
           style={({ pressed }) => [
             styles.backButton,
             pressed &&
-              styles.buttonPressed,
+            styles.buttonPressed,
           ]}
           onPress={() => router.back()}
         >
@@ -215,7 +233,7 @@ export default function ListadoPedidosScreen() {
         contentContainerStyle={[
           styles.content,
           pedidos.length === 0 &&
-            styles.emptyContent,
+          styles.emptyContent,
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -253,7 +271,7 @@ export default function ListadoPedidosScreen() {
               style={({ pressed }) => [
                 styles.emptyButton,
                 pressed &&
-                  styles.buttonPressed,
+                styles.buttonPressed,
               ]}
               onPress={() =>
                 router.push("/productos")
@@ -287,7 +305,7 @@ export default function ListadoPedidosScreen() {
           style={({ pressed }) => [
             styles.floatingButton,
             pressed &&
-              styles.buttonPressed,
+            styles.buttonPressed,
           ]}
           onPress={() =>
             router.push("/productos")

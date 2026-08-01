@@ -6,6 +6,10 @@ import type {
   Pedido,
 } from "../../domain/models/Pedido";
 
+import type {
+  PedidoRemoto,
+} from "../firebase/PedidoFirebaseService";
+
 interface PedidoRow {
   id: number;
   productoId: number | null;
@@ -248,6 +252,172 @@ export async function listarEliminacionesPendientes(
     `,
     [usuarioUid]
   );
+}
+
+export type ResultadoPedidoRemoto =
+  | "insertado"
+  | "actualizado"
+  | "sinCambios"
+  | "omitido";
+
+async function resolverProductoId(
+  database: SQLiteDatabase,
+  productoId: number | null
+): Promise<number | null> {
+  if (productoId === null) {
+    return null;
+  }
+
+  const producto =
+    await database.getFirstAsync<{
+      id: number;
+    }>(
+      `
+        SELECT id
+        FROM productos
+        WHERE id = ?
+      `,
+      [productoId]
+    );
+
+  /*
+   * Evita errores de clave foránea si el producto
+   * remoto no existe en el catálogo local.
+   */
+  return producto?.id ?? null;
+}
+
+export async function guardarPedidoRemotoEnSQLite(
+  database: SQLiteDatabase,
+  pedido: PedidoRemoto
+): Promise<ResultadoPedidoRemoto> {
+  const existente =
+    await database.getFirstAsync<PedidoRow>(
+      `
+        SELECT
+          id,
+          productoId,
+          firebaseId,
+          usuarioUid,
+          clienteNombre,
+          producto,
+          cantidad,
+          precio,
+          estado,
+          fechaRegistro,
+          fechaActualizacion,
+          sincronizado
+        FROM pedidos
+        WHERE firebaseId = ?
+          AND usuarioUid = ?
+        LIMIT 1
+      `,
+      [
+        pedido.firebaseId,
+        pedido.usuarioUid,
+      ]
+    );
+
+  /*
+   * Si existe una modificación local pendiente,
+   * no la reemplazamos con la versión remota.
+   */
+  if (
+    existente &&
+    existente.sincronizado === 0
+  ) {
+    return "omitido";
+  }
+
+  const productoId =
+    await resolverProductoId(
+      database,
+      pedido.productoId
+    );
+
+  if (!existente) {
+    await database.runAsync(
+      `
+        INSERT INTO pedidos (
+          productoId,
+          firebaseId,
+          usuarioUid,
+          clienteNombre,
+          producto,
+          cantidad,
+          precio,
+          estado,
+          fechaRegistro,
+          fechaActualizacion,
+          sincronizado
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+      `,
+      [
+        productoId,
+        pedido.firebaseId,
+        pedido.usuarioUid,
+        pedido.clienteNombre,
+        pedido.producto,
+        pedido.cantidad,
+        pedido.precio,
+        pedido.estado,
+        pedido.fechaRegistro,
+        pedido.fechaActualizacion,
+      ]
+    );
+
+    return "insertado";
+  }
+
+  const sinCambios =
+    existente.productoId === productoId &&
+    existente.clienteNombre ===
+      pedido.clienteNombre &&
+    existente.producto === pedido.producto &&
+    existente.cantidad === pedido.cantidad &&
+    existente.precio === pedido.precio &&
+    existente.estado === pedido.estado &&
+    existente.fechaRegistro ===
+      pedido.fechaRegistro &&
+    existente.fechaActualizacion ===
+      pedido.fechaActualizacion;
+
+  if (sinCambios) {
+    return "sinCambios";
+  }
+
+  await database.runAsync(
+    `
+      UPDATE pedidos
+      SET
+        productoId = ?,
+        clienteNombre = ?,
+        producto = ?,
+        cantidad = ?,
+        precio = ?,
+        estado = ?,
+        fechaRegistro = ?,
+        fechaActualizacion = ?,
+        sincronizado = 1
+      WHERE id = ?
+        AND usuarioUid = ?
+    `,
+    [
+      productoId,
+      pedido.clienteNombre,
+      pedido.producto,
+      pedido.cantidad,
+      pedido.precio,
+      pedido.estado,
+      pedido.fechaRegistro,
+      pedido.fechaActualizacion,
+      existente.id,
+      pedido.usuarioUid,
+    ]
+  );
+
+  return "actualizado";
 }
 
 export async function completarEliminacionPendiente(
