@@ -263,6 +263,35 @@ export default function InicioScreen() {
             </Text>
           </Pressable>
 
+          <Pressable
+            style={({ pressed }) => [
+              styles.moduleCard,
+              pressed && styles.buttonPressed,
+            ]}
+            onPress={() => {
+              router.push("/productos-rest");
+            }}
+          >
+            <Text style={styles.moduleIcon}>
+              🥫
+            </Text>
+
+            <View style={styles.moduleInformation}>
+              <Text style={styles.moduleTitle}>
+                Catálogo REST
+              </Text>
+
+              <Text style={styles.moduleDescription}>
+                Consulta alimentos reales para mascotas
+                mediante Open Pet Food Facts.
+              </Text>
+            </View>
+
+            <Text style={styles.arrow}>
+              ›
+            </Text>
+          </Pressable>
+
         </View>
 
 
