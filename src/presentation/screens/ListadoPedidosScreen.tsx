@@ -35,12 +35,12 @@ import {
 } from "../../infrastructure/database/PedidoRepository";
 
 import {
-  useAuth,
-} from "../context/AuthContext";
-
-import {
   sincronizarPedidos,
 } from "../../infrastructure/sync/PedidoSyncService";
+
+import {
+  useAuth,
+} from "../context/AuthContext";
 
 export default function ListadoPedidosScreen() {
   const database = useSQLiteContext();
@@ -59,14 +59,15 @@ export default function ListadoPedidosScreen() {
     useState("");
 
   const cargarPedidos = useCallback(
-    async (mostrarCarga = true) => {
+    async (
+      mostrarCarga: boolean = true
+    ): Promise<void> => {
       if (!usuario) {
         setPedidos([]);
         setCargando(false);
+        setActualizando(false);
         return;
       }
-
-
 
       try {
         if (mostrarCarga) {
@@ -75,23 +76,46 @@ export default function ListadoPedidosScreen() {
 
         setError("");
 
+        /*
+         * Primero intentamos sincronizar:
+         *
+         * Firestore -> SQLite:
+         * recupera pedidos creados anteriormente
+         * o desde otra instalación.
+         *
+         * SQLite -> Firestore:
+         * envía cambios que todavía estén pendientes.
+         *
+         * Si no hay Internet, el error de sincronización
+         * no bloquea la consulta local.
+         */
         try {
-          await sincronizarPedidos(
-            database,
-            usuario.uid
+          const resultadoSincronizacion =
+            await sincronizarPedidos(
+              database,
+              usuario.uid
+            );
+
+          console.log(
+            "Resultado de sincronización:",
+            resultadoSincronizacion
           );
         } catch (syncError) {
           console.warn(
-            "No se pudo sincronizar antes de listar:",
+            "No se pudo sincronizar. Se mostrarán los pedidos locales:",
             syncError
           );
         }
 
-        const resultado =
-          await listarPedidos(
-            database,
-            usuario.uid
-          );
+        /*
+         * Después de sincronizar consultamos SQLite.
+         * De esta manera aparecen también los pedidos
+         * descargados desde Firestore.
+         */
+        const resultado = await listarPedidos(
+          database,
+          usuario.uid
+        );
 
         setPedidos(resultado);
       } catch (caughtError) {
@@ -101,7 +125,7 @@ export default function ListadoPedidosScreen() {
         );
 
         setError(
-          "No se pudieron cargar tus pedidos"
+          "No se pudieron cargar los pedidos guardados en el dispositivo."
         );
       } finally {
         setCargando(false);
@@ -114,30 +138,64 @@ export default function ListadoPedidosScreen() {
     ]
   );
 
+  /*
+   * Se ejecuta cada vez que la pantalla vuelve
+   * a estar activa.
+   */
   useFocusEffect(
     useCallback(() => {
-      cargarPedidos();
+      void cargarPedidos();
 
       return undefined;
     }, [cargarPedidos])
   );
 
-  async function actualizarListado() {
+  async function actualizarListado():
+  Promise<void> {
     setActualizando(true);
+
     await cargarPedidos(false);
+  }
+
+  function abrirDetalle(
+    pedidoId: number
+  ): void {
+    router.push({
+      pathname: "/pedidos/[id]",
+      params: {
+        id: pedidoId.toString(),
+      },
+    });
+  }
+
+  function abrirCatalogo(): void {
+    router.push("/productos");
   }
 
   if (cargando) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.centerContainer}>
+      <SafeAreaView
+        style={styles.safeArea}
+      >
+        <View
+          style={styles.centerContainer}
+        >
           <ActivityIndicator
             size="large"
             color="#176B5B"
           />
 
-          <Text style={styles.loadingText}>
-            Cargando tus pedidos...
+          <Text
+            style={styles.loadingTitle}
+          >
+            Cargando pedidos
+          </Text>
+
+          <Text
+            style={styles.loadingText}
+          >
+            Recuperando información local y
+            sincronizando con la nube...
           </Text>
         </View>
       </SafeAreaView>
@@ -146,8 +204,12 @@ export default function ListadoPedidosScreen() {
 
   if (error) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.centerContainer}>
+      <SafeAreaView
+        style={styles.safeArea}
+      >
+        <View
+          style={styles.centerContainer}
+        >
           <Text style={styles.errorIcon}>
             ⚠️
           </Text>
@@ -164,11 +226,11 @@ export default function ListadoPedidosScreen() {
             style={({ pressed }) => [
               styles.retryButton,
               pressed &&
-              styles.buttonPressed,
+                styles.buttonPressed,
             ]}
-            onPress={() =>
-              cargarPedidos()
-            }
+            onPress={() => {
+              void cargarPedidos();
+            }}
           >
             <Text
               style={styles.retryButtonText}
@@ -193,13 +255,15 @@ export default function ListadoPedidosScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView
+      style={styles.safeArea}
+    >
       <View style={styles.header}>
         <Pressable
           style={({ pressed }) => [
             styles.backButton,
             pressed &&
-            styles.buttonPressed,
+              styles.buttonPressed,
           ]}
           onPress={() => router.back()}
         >
@@ -209,9 +273,7 @@ export default function ListadoPedidosScreen() {
         </Pressable>
 
         <View
-          style={
-            styles.headerTextContainer
-          }
+          style={styles.headerTextContainer}
         >
           <Text style={styles.title}>
             Mis pedidos
@@ -232,14 +294,17 @@ export default function ListadoPedidosScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          pedidos.length === 0 &&
-          styles.emptyContent,
+          pedidos.length === 0
+            ? styles.emptyContent
+            : undefined,
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={actualizando}
-            onRefresh={actualizarListado}
+            onRefresh={() => {
+              void actualizarListado();
+            }}
             colors={["#176B5B"]}
             tintColor="#176B5B"
           />
@@ -258,29 +323,23 @@ export default function ListadoPedidosScreen() {
             </Text>
 
             <Text
-              style={
-                styles.emptyDescription
-              }
+              style={styles.emptyDescription}
             >
               Explora el catálogo de SumaqVet,
-              selecciona un producto y realiza
-              tu primer pedido.
+              selecciona un producto y realiza tu
+              primer pedido.
             </Text>
 
             <Pressable
               style={({ pressed }) => [
                 styles.emptyButton,
                 pressed &&
-                styles.buttonPressed,
+                  styles.buttonPressed,
               ]}
-              onPress={() =>
-                router.push("/productos")
-              }
+              onPress={abrirCatalogo}
             >
               <Text
-                style={
-                  styles.emptyButtonText
-                }
+                style={styles.emptyButtonText}
               >
                 Explorar productos
               </Text>
@@ -294,6 +353,9 @@ export default function ListadoPedidosScreen() {
               <PedidoCard
                 key={pedido.id}
                 pedido={pedido}
+                onPress={() =>
+                  abrirDetalle(pedido.id)
+                }
               />
             ))}
           </View>
@@ -305,24 +367,18 @@ export default function ListadoPedidosScreen() {
           style={({ pressed }) => [
             styles.floatingButton,
             pressed &&
-            styles.buttonPressed,
+              styles.buttonPressed,
           ]}
-          onPress={() =>
-            router.push("/productos")
-          }
+          onPress={abrirCatalogo}
         >
           <Text
-            style={
-              styles.floatingButtonIcon
-            }
+            style={styles.floatingButtonIcon}
           >
             ＋
           </Text>
 
           <Text
-            style={
-              styles.floatingButtonText
-            }
+            style={styles.floatingButtonText}
           >
             Comprar productos
           </Text>
@@ -334,10 +390,12 @@ export default function ListadoPedidosScreen() {
 
 interface PedidoCardProps {
   pedido: Pedido;
+  onPress: () => void;
 }
 
 function PedidoCard({
   pedido,
+  onPress,
 }: PedidoCardProps) {
   const total =
     pedido.cantidad * pedido.precio;
@@ -348,24 +406,15 @@ function PedidoCard({
         styles.card,
         pressed && styles.cardPressed,
       ]}
-      onPress={() =>
-        router.push({
-          pathname: "../pedidos/[id]",
-          params: {
-            id: pedido.id.toString(),
-          },
-        })
-      }
+      onPress={onPress}
     >
       <View style={styles.cardHeader}>
         <View
-          style={
-            styles.cardTitleContainer
-          }
+          style={styles.cardTitleContainer}
         >
           <Text
             style={styles.cardProduct}
-            numberOfLines={1}
+            numberOfLines={2}
           >
             {pedido.producto}
           </Text>
@@ -389,7 +438,7 @@ function PedidoCard({
 
         <Text
           style={styles.cardValue}
-          numberOfLines={1}
+          numberOfLines={2}
         >
           {pedido.clienteNombre}
         </Text>
@@ -426,11 +475,13 @@ function PedidoCard({
       </View>
 
       <View style={styles.cardFooter}>
-        <Text style={styles.syncText}>
-          {pedido.sincronizado
-            ? "☁️ Sincronizado"
-            : "📱 Guardado localmente"}
-        </Text>
+        <View style={styles.syncContainer}>
+          <Text style={styles.syncText}>
+            {pedido.sincronizado
+              ? "☁️ Sincronizado"
+              : "📱 Guardado localmente"}
+          </Text>
+        </View>
 
         <Text style={styles.detailText}>
           Ver detalle ›
@@ -447,7 +498,14 @@ interface EstadoBadgeProps {
 function EstadoBadge({
   estado,
 }: EstadoBadgeProps) {
-  const configuracion = {
+  const configuraciones: Record<
+    Pedido["estado"],
+    {
+      texto: string;
+      fondo: string;
+      color: string;
+    }
+  > = {
     PENDIENTE: {
       texto: "Pendiente",
       fondo: "#FFF4CC",
@@ -471,7 +529,10 @@ function EstadoBadge({
       fondo: "#FDE2E1",
       color: "#A12822",
     },
-  }[estado];
+  };
+
+  const configuracion =
+    configuraciones[estado];
 
   return (
     <View
@@ -487,8 +548,7 @@ function EstadoBadge({
         style={[
           styles.badgeText,
           {
-            color:
-              configuracion.color,
+            color: configuracion.color,
           },
         ]}
       >
@@ -511,10 +571,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
   },
 
+  loadingTitle: {
+    marginTop: 18,
+    color: "#26332F",
+    fontSize: 19,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+
   loadingText: {
-    marginTop: 14,
+    maxWidth: 300,
+    marginTop: 8,
     color: "#5D6865",
-    fontSize: 15,
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: "center",
   },
 
   errorIcon: {
@@ -533,6 +604,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     color: "#66726E",
     fontSize: 15,
+    lineHeight: 22,
     textAlign: "center",
   },
 
@@ -674,7 +746,12 @@ const styles = StyleSheet.create({
   },
 
   cardPressed: {
-    opacity: 0.76,
+    opacity: 0.78,
+    transform: [
+      {
+        scale: 0.995,
+      },
+    ],
   },
 
   cardHeader: {
@@ -757,10 +834,14 @@ const styles = StyleSheet.create({
   },
 
   cardFooter: {
+    marginTop: 13,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 13,
+  },
+
+  syncContainer: {
+    flex: 1,
   },
 
   syncText: {
@@ -769,6 +850,7 @@ const styles = StyleSheet.create({
   },
 
   detailText: {
+    marginLeft: 12,
     color: "#176B5B",
     fontSize: 12,
     fontWeight: "bold",
@@ -785,6 +867,13 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     backgroundColor: "#176B5B",
     elevation: 6,
+    shadowColor: "#000000",
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
   },
 
   floatingButtonIcon: {

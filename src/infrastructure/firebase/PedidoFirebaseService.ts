@@ -15,9 +15,7 @@ import type {
   Pedido,
 } from "../../domain/models/Pedido";
 
-import {
-  db,
-} from "./firebaseConfig";
+import { db } from "./firebaseConfig";
 
 export interface PedidoRemoto {
   firebaseId: string;
@@ -50,6 +48,38 @@ function esEstadoPedido(
   );
 }
 
+function convertirFecha(
+  valor: unknown
+): string | null {
+  if (
+    typeof valor === "string" &&
+    valor.trim()
+  ) {
+    return valor;
+  }
+
+  if (
+    valor &&
+    typeof valor === "object" &&
+    "toDate" in valor &&
+    typeof (
+      valor as {
+        toDate?: unknown;
+      }
+    ).toDate === "function"
+  ) {
+    const fecha = (
+      valor as {
+        toDate: () => Date;
+      }
+    ).toDate();
+
+    return fecha.toISOString();
+  }
+
+  return null;
+}
+
 function convertirDocumento(
   documento:
     QueryDocumentSnapshot<DocumentData>
@@ -59,12 +89,20 @@ function convertirDocumento(
   const cantidad = Number(datos.cantidad);
   const precio = Number(datos.precio);
 
+  const fechaRegistro =
+    convertirFecha(datos.fechaRegistro);
+
+  const fechaActualizacion =
+    convertirFecha(
+      datos.fechaActualizacion
+    ) ?? fechaRegistro;
+
   if (
     typeof datos.usuarioUid !== "string" ||
     typeof datos.clienteNombre !== "string" ||
     typeof datos.producto !== "string" ||
-    typeof datos.fechaRegistro !== "string" ||
-    typeof datos.fechaActualizacion !== "string" ||
+    !fechaRegistro ||
+    !fechaActualizacion ||
     !esEstadoPedido(datos.estado) ||
     !Number.isInteger(cantidad) ||
     cantidad <= 0 ||
@@ -78,10 +116,13 @@ function convertirDocumento(
     return null;
   }
 
+  const productoIdNumerico =
+    Number(datos.productoId);
+
   const productoId =
-    typeof datos.productoId === "number" &&
-    Number.isInteger(datos.productoId)
-      ? datos.productoId
+    Number.isInteger(productoIdNumerico) &&
+    productoIdNumerico > 0
+      ? productoIdNumerico
       : null;
 
   return {
@@ -93,9 +134,8 @@ function convertirDocumento(
     cantidad,
     precio,
     estado: datos.estado,
-    fechaRegistro: datos.fechaRegistro,
-    fechaActualizacion:
-      datos.fechaActualizacion,
+    fechaRegistro,
+    fechaActualizacion,
   };
 }
 
@@ -138,19 +178,26 @@ export async function guardarPedidoFirestore(
 export async function obtenerPedidosFirestore(
   usuarioUid: string
 ): Promise<PedidoRemoto[]> {
+  const usuarioNormalizado =
+    usuarioUid.trim();
+
+  if (!usuarioNormalizado) {
+    return [];
+  }
+
   const consulta = query(
     collection(db, "pedidos"),
     where(
       "usuarioUid",
       "==",
-      usuarioUid
+      usuarioNormalizado
     )
   );
 
   const resultado =
     await getDocs(consulta);
 
-  return resultado.docs
+  const pedidos = resultado.docs
     .map(convertirDocumento)
     .filter(
       (
@@ -158,16 +205,26 @@ export async function obtenerPedidosFirestore(
       ): pedido is PedidoRemoto =>
         pedido !== null
     );
+
+  console.log(
+    `${pedidos.length} pedidos descargados desde Firestore`
+  );
+
+  return pedidos;
 }
 
 export async function eliminarPedidoFirestore(
   firebaseId: string
 ): Promise<void> {
-  const referencia = doc(
-    db,
-    "pedidos",
-    firebaseId
-  );
+  if (!firebaseId.trim()) {
+    return;
+  }
 
-  await deleteDoc(referencia);
+  await deleteDoc(
+    doc(
+      db,
+      "pedidos",
+      firebaseId
+    )
+  );
 }
